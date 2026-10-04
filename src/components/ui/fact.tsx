@@ -9,6 +9,7 @@ export interface FactView {
   display: string;
   source: string;
   asOf: string;
+  unit?: string;
 }
 
 const when = (iso: string) =>
@@ -48,9 +49,9 @@ export function RichText({ template, facts }: { template: string; facts: Record<
   for (const m of template.matchAll(TOKEN)) {
     if (m.index! > last) parts.push(template.slice(last, m.index));
     const f = facts[m[1]];
-    parts.push(f ? <Fact key={`${m.index}`} f={f} /> : <span key={`${m.index}`}>—</span>);
+    parts.push(!f ? <span key={`f${m.index}`}>—</span> : f.unit === "text" ? <span key={`f${m.index}`}>{f.display}</span> : <Fact key={`f${m.index}`} f={f} />);
     last = m.index! + m[0].length;
   }
   if (last < template.length) parts.push(template.slice(last));
-  return <>{parts.map((p, i) => (typeof p === "string" ? <React.Fragment key={i}>{p}</React.Fragment> : p))}</>;
+  return <>{parts.map((p, i) => (typeof p === "string" ? <React.Fragment key={`t${i}`}>{p}</React.Fragment> : p))}</>;
 }

@@ -17,7 +17,7 @@ export async function GET() {
   });
 }
 
-const Body = z.object({ profileId: z.string().uuid() });
+const Body = z.object({ profileId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) });
 
 export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));

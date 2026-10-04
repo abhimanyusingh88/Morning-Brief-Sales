@@ -103,8 +103,9 @@ export function templateCard(c: CardContext): CardText {
     watch.push("Check whether the recent ticket was a hedge or a conviction trade before pitching the other side.");
   }
   points.push("Ask what they want from us today: levels, a screen of alternatives, or color on flow.");
-  watch.push(c.tier === 1 ? "Top-tier relationship: keep it short, specific and prepared." : "Confirm the news driver with research before attributing the move.");
-  if (ev && ev.calendar === false && ev.simulated) watch.push("Headline is from a feed summary; verify with the source before quoting it to the client.");
+  const newsDriver = Boolean(ev && ev.calendar === false);
+  watch.push(c.tier === 1 ? "Top-tier relationship: keep it short, specific and prepared." : newsDriver ? "The driver comes from a newswire summary; confirm it with research before quoting it to the client." : "Confirm what is behind the move with research before attributing it.");
+  if (c.tier === 1 && newsDriver) watch.push("The driver comes from a newswire summary; confirm it with research before quoting it to the client.");
 
   return { headline, why, talkingPoints: points.slice(0, 4), watchOuts: watch.slice(0, 3) };
 }

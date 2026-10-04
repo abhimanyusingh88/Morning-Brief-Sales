@@ -108,7 +108,7 @@ export function addEventFacts(fb: FactBook, e: Snapshot["events"][number], n: st
   const time = `ev.${n}.time`;
   fb.add({ key: title, label: "Event", value: null, display: e.title, unit: "text", source: e.sourceLabel, asOf: e.occurredAt });
   const t = new Date(e.occurredAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: NY, hour12: true });
-  fb.add({ key: time, label: "Event time (ET)", value: null, display: `${t} ET`, unit: "time", source: e.sourceLabel, asOf: e.occurredAt });
+  fb.add({ key: time, label: `${e.title} (time, ET)`, value: null, display: `${t} ET`, unit: "time", source: e.sourceLabel, asOf: e.occurredAt });
   return { title, time };
 }
 

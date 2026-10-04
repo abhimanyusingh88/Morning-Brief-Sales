@@ -72,3 +72,15 @@ describe("/api/health", () => {
     expect(body.market.simulated).toBe(true);
   });
 });
+
+describe("every persona can sign in", () => {
+  it("accepts all seeded profile ids (they are deterministic, not RFC-versioned UUIDs)", async () => {
+    const db = await testDb();
+    const { POST } = await import("../src/app/api/session/route");
+    const ids = await db.asService((q) => q<{ id: string }>(`select id from profiles`));
+    for (const { id } of ids) {
+      const r = await POST(new Request("http://x/api/session", { method: "POST", body: JSON.stringify({ profileId: id }) }));
+      expect(r.status, id).toBe(200);
+    }
+  });
+});

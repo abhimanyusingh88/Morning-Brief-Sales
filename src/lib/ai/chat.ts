@@ -10,7 +10,7 @@ import { validateText } from "./validator";
  * simply do not exist as far as the assistant is concerned. Answers are token strings like everything
  * else: figures come from facts, never from the model.
  */
-export interface FactView { key: string; label: string; display: string; source: string; asOf: string }
+export interface FactView { key: string; label: string; display: string; source: string; asOf: string; unit?: string }
 export interface ChatAnswer {
   template: string;
   facts: Record<string, FactView>;
@@ -34,7 +34,7 @@ interface Ctx {
   now: string;
 }
 const add = (c: Ctx, f: Fact) => { c.facts.set(f.key, f); return `{{${f.key}}}`; };
-const view = (f: Fact): FactView => ({ key: f.key, label: f.label, display: f.display, source: f.source, asOf: f.asOf });
+const view = (f: Fact): FactView => ({ key: f.key, label: f.label, display: f.display, source: f.source, asOf: f.asOf, unit: f.unit });
 const TOKEN = /\{\{([A-Za-z0-9_.:\-]+)\}\}/g;
 const tokensIn = (s: string) => [...s.matchAll(TOKEN)].map((m) => m[1]);
 

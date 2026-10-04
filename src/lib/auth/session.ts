@@ -50,15 +50,16 @@ export interface Me {
   deskId: string | null;
   deskName: string | null;
   email: string;
+  hue: number;
 }
 
 export async function loadMe(profileId: string): Promise<Me | null> {
   const db = await getDb();
   const rows = await db.asUser(profileId, (q) => q(
-    `select p.id, p.full_name, p.initials, p.title, p.role, p.desk_id, d.name desk_name, p.email
+    `select p.id, p.full_name, p.initials, p.title, p.role, p.desk_id, d.name desk_name, p.email, p.avatar_hue
        from profiles p left join desks d on d.id = p.desk_id where p.id = $1`, [profileId]));
   const r = rows[0];
-  return r ? { id: String(r.id), fullName: String(r.full_name), initials: String(r.initials), title: String(r.title), role: r.role as Role, deskId: (r.desk_id as string) ?? null, deskName: (r.desk_name as string) ?? null, email: String(r.email) } : null;
+  return r ? { id: String(r.id), fullName: String(r.full_name), initials: String(r.initials), title: String(r.title), role: r.role as Role, deskId: (r.desk_id as string) ?? null, deskName: (r.desk_name as string) ?? null, email: String(r.email), hue: Number(r.avatar_hue) } : null;
 }
 
 /** The signed-in person, or null. Server components and route handlers call this. */

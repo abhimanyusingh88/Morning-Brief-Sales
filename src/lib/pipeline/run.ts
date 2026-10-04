@@ -95,11 +95,12 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
     const set = (p: Partial<Pick<StepState, "rowsIn" | "rowsOut" | "detail">>) => Object.assign(s, p);
     try {
       const r = await fn(log, set);
+      const realMs = Date.now() - t0;
       const wait = (o.minStepMs ?? 0) - (Date.now() - t0);
       if (wait > 0) await sleep(wait);
       s.status = "succeeded";
       s.finishedAt = new Date().toISOString();
-      s.detail = { ...s.detail, ms: Date.now() - t0 };
+      s.detail = { ...s.detail, ms: realMs };
       await persist(s);
       publish(runId, { type: "step", runId, step: structuredClone(s) });
       return r;
@@ -282,6 +283,16 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
   }
 }
 
+/**
+ * Demo clock: briefs are stamped with the firm's scheduled publish time on the business date (06:30 New York,
+ * a little spread per person), so the product reads as it would on a live morning. The real run time is in pipeline_runs.
+ */
+function publishedAt(businessDate: string, profileId: string): string {
+  const jitter = parseInt(profileId.slice(0, 4), 16) % 240; // seconds
+  const base = new Date(`${businessDate}T06:30:00-04:00`).getTime();
+  return new Date(base + jitter * 1000).toISOString();
+}
+
 const tokensOf = (s: string) => [...s.matchAll(/\{\{([^}]+)\}\}/g)].map((m) => m[1]);
 
 async function publishProfile(db: Db, runId: string, businessDate: string, po: ProfileOut): Promise<number> {
@@ -296,11 +307,11 @@ async function publishProfile(db: Db, runId: string, businessDate: string, po: P
 
     const b = (await q<{ id: string }>(
       `insert into briefs (business_date, profile_id, run_id, status, headline, version, generated_at, published_at)
-       values ($1, $2, $3, 'published', $4, 1, now(), now())
+       values ($1, $2, $3, 'published', $4, 1, $5::timestamptz, $5::timestamptz)
        on conflict (business_date, profile_id) do update
-         set run_id = excluded.run_id, status = 'published', headline = excluded.headline, version = briefs.version + 1, generated_at = now(), published_at = now()
+         set run_id = excluded.run_id, status = 'published', headline = excluded.headline, version = briefs.version + 1, generated_at = excluded.generated_at, published_at = excluded.published_at
        returning id`,
-      [businessDate, prep.profileId, runId, fb.render(po.brief.headline)],
+      [businessDate, prep.profileId, runId, fb.render(po.brief.headline), publishedAt(businessDate, prep.profileId)],
     ))[0].id;
 
     await q(`delete from brief_sections where brief_id = $1`, [b]);
