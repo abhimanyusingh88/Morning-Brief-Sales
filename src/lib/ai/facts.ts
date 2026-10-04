@@ -12,6 +12,8 @@ export interface Fact {
   unit: "pct" | "bp" | "usd" | "level" | "days" | "count" | "text" | "time";
   source: string;
   asOf: string; // ISO
+  /** plain-words descriptor for a writer (direction, size). Never contains digits. Not stored. */
+  hint?: string;
 }
 
 export const TOKEN_RE = /\{\{([A-Za-z0-9_.:\-]+)\}\}/g;

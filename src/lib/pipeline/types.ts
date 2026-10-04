@@ -7,6 +7,7 @@ export interface InstrumentInfo {
   sector: string | null;
   assetClass: "equity" | "rates" | "credit" | "fx" | "commodity" | "index" | "vol";
   unit: MoveUnit;
+  decimals: number;
   vol: number;
 }
 

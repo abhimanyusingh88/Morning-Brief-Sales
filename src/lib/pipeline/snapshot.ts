@@ -8,7 +8,7 @@ const day = (x: unknown) => (x instanceof Date ? x.toISOString().slice(0, 10) : 
 /** Loads everything the matcher needs in a handful of round trips. Pipeline-only: runs with service access. */
 export async function loadSnapshot(q: Q, businessDate: string): Promise<Snapshot> {
   const [inst, quotes, clients, cov, pos, ints, last, fus, trades, evs, restricted, prefs] = await Promise.all([
-    q(`select id, symbol, name, sector, asset_class, unit, (meta->>'vol')::float8 vol from instruments`),
+    q(`select id, symbol, name, sector, asset_class, unit, decimals, (meta->>'vol')::float8 vol from instruments`),
     q(`select instrument_id, last, prev_close, chg, as_of, source from market_quotes`),
     q(`select id, name, short_name, segment, tier, aum_usd_mn, status from clients`),
     q(`select client_id, profile_id from coverage`),
@@ -26,7 +26,7 @@ export async function loadSnapshot(q: Q, businessDate: string): Promise<Snapshot
   ]);
 
   const instruments = new Map<string, InstrumentInfo>(
-    inst.map((r) => [String(r.id), { id: String(r.id), symbol: String(r.symbol), name: String(r.name), sector: (r.sector as string) ?? null, assetClass: r.asset_class as InstrumentInfo["assetClass"], unit: r.unit as InstrumentInfo["unit"], vol: num(r.vol) }]),
+    inst.map((r) => [String(r.id), { id: String(r.id), symbol: String(r.symbol), name: String(r.name), sector: (r.sector as string) ?? null, assetClass: r.asset_class as InstrumentInfo["assetClass"], unit: r.unit as InstrumentInfo["unit"], decimals: num(r.decimals), vol: num(r.vol) }]),
   );
   const quoteMap = new Map<string, QuoteInfo>(
     quotes.map((r) => [String(r.instrument_id), { last: num(r.last), prevClose: num(r.prev_close), chg: num(r.chg), asOf: iso(r.as_of), source: String(r.source) }]),
