@@ -1,7 +1,7 @@
 import type { Db } from "../db/types";
 import { formatLevel, formatMove, formatUsd } from "../market/format";
 import type { Candidate, InstrumentInfo, Snapshot, TriggerKind } from "../pipeline/types";
-import { FactBook, type Fact } from "./facts";
+import type { FactBook } from "./facts";
 
 const NY = "America/New_York";
 
@@ -11,7 +11,6 @@ export const keySym = (s: string) => s.replace(/[^A-Za-z0-9]/g, "_");
 export const mask = (s: string) => s.replace(/\p{N}[\p{N}.,:/-]*/gu, "[figure]").replace(/[%$€£¥]/g, "");
 
 const day = (x: unknown) => (x instanceof Date ? x.toISOString().slice(0, 10) : String(x).slice(0, 10));
-const iso = (x: unknown) => (x instanceof Date ? x.toISOString() : new Date(String(x)).toISOString());
 
 export interface ClientBundle {
   client: { id: string; name: string; shortName: string; segment: string; tier: number; mandate: string; riskAppetite: string };

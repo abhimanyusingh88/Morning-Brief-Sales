@@ -11,7 +11,7 @@ import type { Snapshot } from "../src/lib/pipeline/types";
 
 const D = "2026-10-05";
 let snap: Snapshot;
-let prepared: Prepared[] = [];
+const prepared: Prepared[] = [];
 let names = new Map<string, string>();
 
 beforeAll(async () => {

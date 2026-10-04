@@ -63,8 +63,8 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
   const started = Date.now();
 
   const runId = (await db.asService((q) =>
-    q<{ id: string }>(`insert into pipeline_runs (business_date, trigger, scope, status) values ($1, $2, $3, 'running') returning id`,
-      [businessDate, o.trigger ?? "manual", o.profileIds ? "subset" : "all"]),
+    q<{ id: string }>(`insert into pipeline_runs (id, business_date, trigger, scope, status) values (coalesce($4::uuid, gen_random_uuid()), $1, $2, $3, 'running') returning id`,
+      [businessDate, o.trigger ?? "manual", o.profileIds ? "subset" : "all", o.runId ?? null]),
   ))[0].id;
 
   const steps: StepState[] = STEPS.map(([key, label], i) => ({ seq: i + 1, key, label, status: "pending", startedAt: null, finishedAt: null, rowsIn: null, rowsOut: null, detail: {}, log: [] }));
@@ -74,18 +74,24 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
   ));
   publish(runId, { type: "run", runId, businessDate, status: "running", steps: structuredClone(steps) });
 
-  const persist = (s: StepState) => db.asService((q) => q(
-    `update pipeline_steps set status=$3, started_at=$4, finished_at=$5, rows_in=$6, rows_out=$7, detail=$8::jsonb, log=$9::text[] where run_id=$1 and seq=$2`,
-    [runId, s.seq, s.status, s.startedAt, s.finishedAt, s.rowsIn, s.rowsOut, JSON.stringify(s.detail), s.log],
-  ));
+  // Writes are chained so an older snapshot of a step can never overwrite a newer one.
+  let writes: Promise<unknown> = Promise.resolve();
+  const persist = (s: StepState) => {
+    writes = writes.then(() => db.asService((q) => q(
+      `update pipeline_steps set status=$3, started_at=$4, finished_at=$5, rows_in=$6, rows_out=$7, detail=$8::jsonb, log=$9::text[] where run_id=$1 and seq=$2`,
+      [runId, s.seq, s.status, s.startedAt, s.finishedAt, s.rowsIn, s.rowsOut, JSON.stringify(s.detail), [...s.log]],
+    ))).catch(() => {});
+    return writes;
+  };
 
   async function step<T>(key: string, fn: (log: (line: string) => void, set: (p: Partial<Pick<StepState, "rowsIn" | "rowsOut" | "detail">>) => void) => Promise<T>): Promise<T> {
     const s = steps.find((x) => x.key === key)!;
     s.status = "running";
     s.startedAt = new Date().toISOString();
+    void persist(s);
     publish(runId, { type: "step", runId, step: structuredClone(s) });
     const t0 = Date.now();
-    const log = (line: string) => { s.log.push(line); publish(runId, { type: "log", runId, key, line, at: new Date().toISOString() }); };
+    const log = (line: string) => { s.log.push(line); void persist(s); publish(runId, { type: "log", runId, key, line, at: new Date().toISOString() }); };
     const set = (p: Partial<Pick<StepState, "rowsIn" | "rowsOut" | "detail">>) => Object.assign(s, p);
     try {
       const r = await fn(log, set);
