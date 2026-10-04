@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import type { Db, Q } from "./types";
@@ -19,6 +19,7 @@ async function applyMigrations(pg: PGlite) {
 }
 
 export async function openPglite(dataDir?: string): Promise<{ db: Db; pg: PGlite }> {
+  if (dataDir) await mkdir(dataDir, { recursive: true });
   const pg = dataDir ? new PGlite(dataDir) : new PGlite();
   await pg.waitReady;
   await applyMigrations(pg);

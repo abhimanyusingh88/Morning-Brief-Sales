@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:local": "tsx scripts/dev-db.ts",
-    "db:reset": "tsx scripts/dev-db.ts --reset",
+    "db:reset": "rm -rf .data && tsx scripts/dev-db.ts",
+    "brief": "tsx scripts/pipeline.ts",
     "shots": "tsx scripts/screens.ts"
   },
   "dependencies": {
