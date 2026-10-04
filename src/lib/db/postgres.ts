@@ -1,9 +1,10 @@
 import postgres from "postgres";
 import type { Db, Q } from "./types";
+import { normalizeDatabaseUrl } from "./url";
 
 export function openPostgres(url: string): Db {
   // Supabase pooler runs in transaction mode: no prepared statements.
-  const sql = postgres(url, { prepare: false, max: 10, idle_timeout: 20, connect_timeout: 15, ssl: "require" });
+  const sql = postgres(normalizeDatabaseUrl(url), { prepare: false, max: 10, idle_timeout: 20, connect_timeout: 15, ssl: "require" });
   const runner = (tx: postgres.TransactionSql): Q =>
     (async (text: string, params?: unknown[]) => (await tx.unsafe(text, params as never[])) as unknown as never[]) as Q;
   return {
