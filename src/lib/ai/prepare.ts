@@ -10,6 +10,9 @@ export interface Prepared {
   brief: BriefContext;
   /** names that must never appear in model-written text for this person */
   forbidden: string[];
+  /** ranking detail per client, stored on the card so the UI can explain "why this one" */
+  cardScore: Map<string, number>;
+  cardFactors: Map<string, Record<string, unknown>>;
 }
 
 export const forbiddenTerms = (snap: Snapshot) =>
@@ -34,5 +37,18 @@ export async function prepareProfile(opts: { db: Db; snap: Snapshot; profileId: 
     if (ctx) cards.push(ctx);
   }
   const brief = await buildBriefContext({ db, fb: facts, snap, profileId, firstName, cards });
-  return { profileId, facts, cards, brief, forbidden: forbiddenTerms(snap) };
+  const cardScore = new Map<string, number>();
+  const cardFactors = new Map<string, Record<string, unknown>>();
+  for (const cand of picks) {
+    cardScore.set(cand.clientId, cand.score);
+    cardFactors.set(cand.clientId, {
+      ...cand.primary.factors,
+      primaryScore: cand.primary.score,
+      trigger: cand.primary.trigger.kind,
+      label: cand.primary.trigger.label,
+      group: cand.primary.trigger.group,
+      alsoRelevant: cand.others.slice(0, 3).map((o) => ({ label: o.trigger.label, score: o.score })),
+    });
+  }
+  return { profileId, facts, cards, brief, forbidden: forbiddenTerms(snap), cardScore, cardFactors };
 }
