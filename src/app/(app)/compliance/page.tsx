@@ -5,7 +5,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/states";
 import { getMe } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
-import { fmtTimeET, timeAgo } from "@/lib/format";
+import { fmtDate, fmtTimeET, timeAgo } from "@/lib/format";
 
 export const metadata = { title: "Compliance" };
 export const dynamic = "force-dynamic";
@@ -51,7 +51,7 @@ export default async function Compliance() {
             <CardHeader title="Information barrier" sub="Restricted-list names are withheld from every salesperson's output" />
             {d.restricted.length ? (
               <table className="w-full text-[13px]"><tbody className="divide-y divide-line">
-                {d.restricted.map((r, i) => <tr key={i}><td className="px-5 py-2.5"><span className="font-semibold">{String(r.name ?? r.title)}</span> <span className="mono text-[11.5px] text-subtle">{String(r.symbol ?? "")}</span></td><td className="px-3 py-2.5 text-muted">{String(r.title)}</td><td className="num px-5 py-2.5 text-right text-muted">{String(r.bd)}</td></tr>)}
+                {d.restricted.map((r, i) => <tr key={i}><td className="px-5 py-2.5"><span className="font-semibold">{String(r.name ?? r.title)}</span> <span className="mono text-[11.5px] text-subtle">{String(r.symbol ?? "")}</span></td><td className="px-3 py-2.5 text-muted">{String(r.title)}</td><td className="num whitespace-nowrap px-5 py-2.5 text-right text-muted">{fmtDate(String(r.bd), { month: "short", day: "numeric" })}</td></tr>)}
               </tbody></table>
             ) : <EmptyState title="Restricted list is empty" />}
             {(d.barrier?.log as string[] | undefined)?.length ? <p className="border-t border-line px-5 py-3 text-[12.5px] text-muted">Last run: {(d.barrier!.log as string[]).filter((l) => /restricted/i.test(l)).join(" ")}</p> : null}

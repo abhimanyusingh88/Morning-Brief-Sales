@@ -85,7 +85,7 @@ export default async function Desk() {
             <ul className="space-y-3 px-5 py-4">
               {themes.map((t) => (
                 <li key={String(t.g)}>
-                  <div className="flex justify-between text-[13px]"><span className="font-medium">{GROUP_LABEL(String(t.g))}</span><span className="num text-muted">{Number(t.n)} calls</span></div>
+                  <div className="flex justify-between text-[13px]"><span className="font-medium">{GROUP_LABEL(String(t.g))}</span><span className="num text-muted">{Number(t.n)} {Number(t.n) === 1 ? "call" : "calls"}</span></div>
                   <div className="mt-1 h-1.5 rounded-full bg-sunken"><div className="h-1.5 rounded-full bg-brand" style={{ width: `${(Number(t.n) / maxTheme) * 100}%` }} /></div>
                 </li>
               ))}

@@ -62,7 +62,11 @@ async function topCalls(c: Ctx, n = 5) {
     `select cc.id, cc.rank, cc.urgency, cl.name, cc.why_template, cc.headline from call_cards cc join clients cl on cl.id = cc.client_id
       where cc.brief_id = $1 and cc.status in ('new','snoozed') order by cc.rank limit $2`, [b.id, n]);
   await loadBriefFacts(c, b.id, rows.flatMap((r) => tokensIn(String(r.why_template))));
-  const lines = rows.map((r) => `• ${r.name}${r.urgency === "now" ? " (call now)" : ""}: ${String(r.why_template).split(/(?<=\.)\s/)[0]}`);
+  const lines = rows.map((r) => {
+    const sentence = String(r.why_template).split(/(?<=\.)\s/)[0];
+    const body = sentence.startsWith(String(r.name)) ? sentence : `${r.name}: ${sentence}`;
+    return `• ${body}${r.urgency === "now" ? " (call now)" : ""}`;
+  });
   return { lines, cards: rows.map((r) => ({ id: String(r.id), client: String(r.name) })) };
 }
 
