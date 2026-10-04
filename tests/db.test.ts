@@ -23,7 +23,10 @@ describe("seeded world", () => {
   it("is re-runnable and keeps ids stable", async () => {
     const db = await testDb();
     const before = await db.asService((q) => q<{ id: string }>("select id from clients order by id limit 3"));
-    await db.asService((q) => q("select app.seed_world('2026-10-02')"));
+    await db.asService(async (q) => {
+      await q("select app.reset_world()");
+      await q("select app.seed_world('2026-10-02')");
+    });
     const after = await db.asService((q) => q<{ id: string }>("select id from clients order by id limit 3"));
     expect(after).toEqual(before);
   });

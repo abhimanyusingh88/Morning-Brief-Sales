@@ -41,8 +41,9 @@ begin
   select max(d) into last_day from (select d::date d from generate_series(p_asof - 6, p_asof, '1 day') d where extract(isodow from d) < 6) x;
   last_day := coalesce(last_day, p_asof);
 
-  truncate public.clients, public.events, public.market_bars, public.market_quotes, public.briefs,
-           public.pipeline_runs, public.chat_threads, public.audit_log, public.signals cascade;
+  if exists (select 1 from public.clients) or exists (select 1 from public.market_bars) then
+    raise exception 'World already seeded. Run app.reset_world() first (see migration 0005).';
+  end if;
 
   create temp table _days on commit drop as
     select d::date as d, row_number() over (order by d)::int as n
