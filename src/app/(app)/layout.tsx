@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="flex min-h-screen">
         <Sidebar role={me.role} firm={String(meta?.firm ?? "Northgate Capital Markets")} />
         <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar me={me} hue={me.hue} asOf={asOf} sources={`Market data: ${String(meta?.s ?? "simulated")}`} />
+          <Topbar me={me} hue={me.hue} asOf={asOf} sources={`Market data: ${String(meta?.s ?? "simulated")}`} firm={String(meta?.firm ?? "Northgate Capital Markets")} />
           <main className="mx-auto w-full max-w-[1280px] flex-1 px-5 py-6 sm:px-8">{children}</main>
         </div>
       </div>

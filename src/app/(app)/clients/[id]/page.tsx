@@ -34,7 +34,7 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
               <h1 className="text-[26px] font-semibold tracking-[-0.02em]">{c.name}</h1>
               <Badge tone={c.tier === 1 ? "navy" : "outline"}>Tier {c.tier}</Badge>
               <Badge tone="outline">{SEGMENT_LABEL[c.segment]}</Badge>
-              {c.status !== "active" ? <Badge tone="amber">{c.status}</Badge> : null}
+              {c.status === "prospect" ? <Badge tone="amber">Prospect</Badge> : null}
             </div>
             <p className="mt-1.5 text-[13.5px] text-muted">{c.region} · {c.country} · client since {fmtDate(c.since, { month: "short", year: "numeric" })}</p>
             <p className="mt-2 max-w-2xl text-[14px] text-ink-2">{c.mandate}. Risk appetite: {c.risk}.</p>

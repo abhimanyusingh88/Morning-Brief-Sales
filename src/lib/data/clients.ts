@@ -40,7 +40,7 @@ export async function getClient360(meId: string, clientId: string) {
       contacts: contacts.map((x) => ({ id: String(x.id), name: String(x.full_name), title: String(x.title), email: String(x.email), phone: String(x.phone), primary: Boolean(x.is_primary) })),
       positions: positions.map((p) => ({ symbol: String(p.symbol), name: String(p.name), sector: (p.sector as string) ?? null, assetClass: String(p.asset_class), unit: p.unit as "pct" | "bp" | "level", usd: Number(p.notional_usd), chg: p.chg == null ? null : Number(p.chg), asOf: p.as_of ? iso(p.as_of) : null })),
       trades: trades.map((t) => ({ symbol: String(t.symbol), name: String(t.name), side: t.side as "buy" | "sell", usd: Number(t.notional_usd), at: iso(t.traded_at) })),
-      interactions: interactions.map((x) => ({ kind: String(x.kind), subject: String(x.subject), note: String(x.note), at: iso(x.occurred_at), sentiment: Number(x.sentiment), author: (x.author as string) ?? null })),
+      interactions: interactions.map((x) => ({ kind: String(x.kind), subject: String(x.subject), note: String(x.note).replace(/\.{2,}/g, ".").replace(/\s{2,}/g, " "), at: iso(x.occurred_at), sentiment: Number(x.sentiment), author: (x.author as string) ?? null })),
       followups: followups.map((f) => ({ id: String(f.id), text: String(f.text), dueOn: day(f.due_on), status: String(f.status) })),
       coverage: covers.map((v) => ({ name: String(v.full_name), role: String(v.role) })),
       interests: interests.map((i) => String(i.tag)),

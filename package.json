@@ -11,7 +11,7 @@
     "test": "vitest run",
     "db:local": "tsx scripts/dev-db.ts",
     "db:reset": "rm -rf .data && tsx scripts/dev-db.ts",
-    "brief": "tsx scripts/pipeline.ts",
+    "brief": "tsx --env-file-if-exists=.env.local scripts/pipeline.ts",
     "shots": "tsx scripts/screens.ts"
   },
   "dependencies": {

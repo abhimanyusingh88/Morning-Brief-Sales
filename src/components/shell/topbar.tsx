@@ -3,10 +3,12 @@ import { UserMenu } from "./user-menu";
 import { SearchTrigger } from "./command-palette";
 import { AskButton } from "./chat-drawer";
 import type { Me } from "@/lib/auth/session";
+import { MobileNav } from "./mobile-nav";
 
-export function Topbar({ me, hue, asOf, sources }: { me: Me; hue: number; asOf: string; sources: string }) {
+export function Topbar({ me, hue, asOf, sources, firm }: { me: Me; hue: number; asOf: string; sources: string; firm: string }) {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface/90 px-5 backdrop-blur">
+      <MobileNav role={me.role} firm={firm} />
       <SearchTrigger><Search size={15} /> <span className="text-subtle">Search clients, calls, pages</span> <kbd className="ml-auto rounded border border-line bg-sunken px-1.5 py-0.5 font-mono text-[10.5px] text-muted">⌘K</kbd></SearchTrigger>
       <div className="ml-auto flex items-center gap-3">
         <div className="hidden items-center gap-2 text-[12px] text-muted md:flex" title={sources}>
