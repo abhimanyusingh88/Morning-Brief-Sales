@@ -31,7 +31,7 @@ With **no** variables at all the app still runs end to end: it boots an embedded
 
 ### Against Supabase
 
-Migrations `0001`–`0004` are already applied to the *Morning Brief* project and seeded. With `DATABASE_URL` set:
+Migrations are applied automatically (in order, under an advisory lock) when the app starts against Supabase; the synthetic world is seeded once and re-seeded when its version changes. With `DATABASE_URL` set:
 
 ```bash
 npm run brief        # run the morning pipeline against that database
@@ -42,6 +42,22 @@ npm run dev
 
 `npm run typecheck` · `npm run lint` · `npm test` · `npm run db:local` · `npm run db:reset` · `npm run brief` · `npm run dev`
 
+## The screens
+
+| Who | Screen | What it shows |
+|---|---|---|
+| Salesperson | Today, Morning brief, Call list, Clients | The ranked calls, the spec-style brief (snapshot, S&P 500 chart, Catalysts, sections), client 360 |
+| Salesperson | Agent | Chat with threads and history; step trace, sources behind every figure, drafts you copy or open in your own mail app (never sent) |
+| Salesperson | Brief setup | Sectors, products, what to include, delivery and send time; applies from the next business day |
+| Desk head, admin, compliance | Morning run | The whole morning in time-lapse (about 90 s): live simulated ET clock, 5 stages and 17 steps, feed map, logs, outage / QC-hold / model controls, results, history |
+| Operations | Data feeds | 14 simulated connectors: health against SLA, rows, latency, payload sample, dependent sections, what the firm provides to go live |
+| Operations | QC review | 8 automated checks per brief plus a simulated spot-check; hold or release a brief |
+| Operations | Deliveries | Dashboard and email-digest deliveries with an isolated email preview; held briefs |
+
+Salespeople never see the operations screens in real life; the demo shows them so the whole pipeline is transparent. See `docs/DEMO.md` for a 2-minute walkthrough.
+
 ## What is simulated
 
 Prices, earnings dates, the macro calendar and every headline are **placeholders** from a market simulator (headlines are flagged `simulated`). Briefs are stamped 06:30 ET on the business date (`DEMO_BUSINESS_DATE` overrides it). A live market-data adapter is required before showing this as real.
+
+Also placeholders: company names are fictional and may collide with real ones; index labels (S&P 500, Nasdaq 100, Russell 2000, Dow) are applied to synthetic data; the email relay is simulated and nothing is ever sent to a client; Fed dates and speakers are invented. With no model key configured the template writer produces all prose; with one, results are cached (`llm_cache`) so a rerun is instant.

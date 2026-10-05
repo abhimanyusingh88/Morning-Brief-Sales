@@ -1,6 +1,7 @@
 "use client";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Copy, Loader2, SendHorizontal, Sparkles, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { RichText, type FactView } from "@/components/ui/fact";
@@ -69,6 +70,7 @@ function DraftCard({ draft, facts }: { draft: NonNullable<Answer["draft"]>; fact
 }
 
 function Drawer({ open, setOpen, initial, onConsumed }: { open: boolean; setOpen: (v: boolean) => void; initial?: string; onConsumed: () => void }) {
+  const router = useRouter();
   const [msgs, setMsgs] = React.useState<Msg[]>([]);
   const [input, setInput] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -119,7 +121,7 @@ function Drawer({ open, setOpen, initial, onConsumed }: { open: boolean; setOpen
         <Dialog.Content aria-describedby={undefined} className="fixed bottom-0 right-0 top-0 z-50 flex w-[min(460px,100vw)] flex-col border-l border-line bg-surface shadow-[var(--shadow-pop)]">
           <div className="flex h-14 items-center justify-between border-b border-line px-4">
             <Dialog.Title className="flex items-center gap-2 text-[14px] font-semibold"><span className="flex h-6 w-6 items-center justify-center rounded-md bg-navy text-cyan"><Sparkles size={13} /></span> Ask Morning Brief</Dialog.Title>
-            <Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close"><X size={16} /></Button></Dialog.Close>
+            <div className="flex items-center gap-1"><Button variant="ghost" size="sm" onClick={() => { setOpen(false); router.push(thread.current ? `/agent?t=${thread.current}` : "/agent"); }}>Open in Agent</Button><Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close"><X size={16} /></Button></Dialog.Close></div>
           </div>
           <div className="scroll-thin flex-1 space-y-4 overflow-y-auto px-4 py-4">
             {!msgs.length ? (
