@@ -1,4 +1,5 @@
 import { rngFor } from "../util/rng";
+import { etInstant } from "../util/time";
 import { defaultScenarios, scenarioByKey, type Override } from "./scenarios";
 import type { InstrumentRef, MarketDataProvider, Quote } from "./types";
 
@@ -37,7 +38,7 @@ export class SimulatedProvider implements MarketDataProvider {
     const overrides = keys.flatMap((k) => scenarioByKey(k)?.overrides ?? []);
     const day = rngFor("mkt:" + businessDate);
     const mkt = day.normal();
-    const asOf = new Date(`${businessDate}T06:20:00-04:00`);
+    const asOf = etInstant(businessDate, 4, 0, 12); // pre-market snapshot taken as the 04:00 ET ingestion starts
 
     return instruments.map((i) => {
       const r = rngFor(`q:${businessDate}:${i.symbol}`);

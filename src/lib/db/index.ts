@@ -17,6 +17,8 @@ export function getDb(): Promise<Db> {
         if (!url) throw new Error("DATABASE_URL is not set");
         const { openPostgres } = await import("./postgres");
         db = openPostgres(url);
+        const applied = await db.migrate?.();
+        if (applied?.length) console.log(`[db] applied migrations: ${applied.join(", ")}`);
       }
       // Seed (embedded only) and prepare today's briefs in the background; pages show progress meanwhile.
       if (!process.env.VITEST && !process.env.MB_NO_BOOT) {

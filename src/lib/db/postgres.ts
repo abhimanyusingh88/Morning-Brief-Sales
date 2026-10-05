@@ -1,3 +1,5 @@
+import { readdir, readFile } from "node:fs/promises";
+import path from "node:path";
 import postgres from "postgres";
 import type { Db, Q } from "./types";
 import { normalizeDatabaseUrl } from "./url";
@@ -26,6 +28,32 @@ export function openPostgres(url: string, opts: { ssl?: boolean; max?: number } 
         return fn(runner(tx));
       }) as never,
     asService: (fn) => sql.begin(async (tx) => fn(runner(tx))) as never,
+    migrate: () => migrate(sql),
     close: () => sql.end({ timeout: 2 }),
   };
+}
+
+const MIGRATIONS = path.join(process.cwd(), "supabase", "migrations");
+/** Migrations 0001-0004 were applied by hand before this runner existed; record them rather than re-running. */
+const BASELINE = 4;
+
+async function migrate(sql: postgres.Sql): Promise<string[]> {
+  const files = (await readdir(MIGRATIONS)).filter((f) => f.endsWith(".sql")).sort();
+  const applied: string[] = [];
+  await sql.begin(async (tx) => {
+    await tx.unsafe("select pg_advisory_xact_lock(7283461)"); // two processes starting together must not both migrate
+    await tx.unsafe("create table if not exists public._migrations (name text primary key, at timestamptz default now())");
+    const done = new Set((await tx.unsafe("select name from public._migrations")).map((r) => String(r.name)));
+    if (!done.size) {
+      const has = await tx.unsafe("select to_regclass('public.firm_settings') is not null as t");
+      if (has[0]?.t) for (const f of files.slice(0, BASELINE)) { await tx.unsafe("insert into public._migrations(name) values ($1) on conflict do nothing", [f]); done.add(f); }
+    }
+    for (const f of files) {
+      if (done.has(f)) continue;
+      await tx.unsafe(await readFile(path.join(MIGRATIONS, f), "utf8"));
+      await tx.unsafe("insert into public._migrations(name) values ($1)", [f]);
+      applied.push(f);
+    }
+  });
+  return applied;
 }
