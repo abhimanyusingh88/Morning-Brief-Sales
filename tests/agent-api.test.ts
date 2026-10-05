@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { testDb, pid } from "./helpers/testdb";
+import { testDb, pid, installTestDb } from "./helpers/testdb";
 import { runPipeline } from "../src/lib/pipeline/run";
 import { signSession } from "../src/lib/auth/session";
 import { answer } from "../src/lib/ai/chat";
@@ -33,7 +33,7 @@ async function say(who: string, message: string, extra: Record<string, unknown> 
 }
 
 beforeAll(async () => {
-  (globalThis as unknown as { __mbDb?: Promise<unknown> }).__mbDb = testDb();
+  installTestDb();
   db = await testDb();
   rahman = await pid("rahman");
   delaney = await pid("delaney");

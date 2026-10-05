@@ -17,7 +17,14 @@ export const jsonTypes = {
 
 export function openPostgres(url: string, opts: { ssl?: boolean; max?: number } = {}): Db {
   // Supabase pooler runs in transaction mode: no prepared statements.
-  const sql = postgres(normalizeDatabaseUrl(url), { prepare: false, max: opts.max ?? 10, idle_timeout: 20, connect_timeout: 15, ssl: opts.ssl === false ? false : "require", types: jsonTypes });
+  const sql = postgres(normalizeDatabaseUrl(url), {
+    prepare: false,
+    max: opts.max ?? 10,
+    idle_timeout: 20,
+    connect_timeout: 15,
+    ssl: opts.ssl === false ? false : "require",
+    types: jsonTypes,
+  });
   const runner = (tx: postgres.TransactionSql): Q =>
     (async (text: string, params?: unknown[]) => (await tx.unsafe(text, params as never[])) as unknown as never[]) as Q;
   return {

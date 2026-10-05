@@ -2,10 +2,33 @@ import { describe, expect, it } from "vitest";
 import { testDb, pid } from "./helpers/testdb";
 import { runPipeline } from "../src/lib/pipeline/run";
 import { subscribe } from "../src/lib/pipeline/bus";
+import type { Db, Q } from "../src/lib/db/types";
 
 const D = "2026-10-05";
 
 describe("pipeline run", () => {
+  it("records initialization failures and closes the progress stream", async () => {
+    const db = await testDb();
+    const failingDb: Db = {
+      ...db,
+      asService: (fn) => db.asService((q) => {
+        const failingQ: Q = (text, params) => {
+          if (text.includes("insert into pipeline_steps")) throw new Error("cannot extract elements from a scalar");
+          return q(text, params);
+        };
+        return fn(failingQ);
+      }),
+    };
+    const r = await runPipeline({ db: failingDb, businessDate: D, useLlm: false });
+    expect(r.status).toBe("failed");
+    expect(r.summary.error).toBe("cannot extract elements from a scalar");
+    const rows = await db.asService(q => q<{ status: string }>("select status from pipeline_runs where id = $1", [r.runId]));
+    expect(rows[0].status).toBe("failed");
+    const events: string[] = [];
+    subscribe(r.runId, e => events.push(e.type));
+    expect(events.at(-1)).toBe("done");
+  });
+
   it("runs every step, persists steps and publishes briefs", async () => {
     const db = await testDb();
     const r = await runPipeline({ db, businessDate: D, trigger: "manual", useLlm: false });

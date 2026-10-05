@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { testDb, pid } from "./helpers/testdb";
+import { testDb, pid, installTestDb } from "./helpers/testdb";
 import { signSession, verifySession } from "../src/lib/auth/session";
 
 beforeAll(async () => {
-  (globalThis as unknown as { __mbDb?: Promise<unknown> }).__mbDb = testDb();
+  installTestDb();
 });
 
 describe("session cookie", () => {

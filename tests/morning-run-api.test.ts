@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { testDb, pid } from "./helpers/testdb";
+import { testDb, pid, installTestDb } from "./helpers/testdb";
 import { signSession } from "../src/lib/auth/session";
 import { syncFeedRegistry } from "../src/lib/feeds/connectors";
 
@@ -10,7 +10,7 @@ vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/ser
 vi.mock("../src/lib/pipeline/run", () => ({ runPipeline }));
 
 beforeAll(async () => {
-  (globalThis as unknown as { __mbDb?: Promise<unknown> }).__mbDb = testDb();
+  installTestDb();
 });
 beforeEach(async () => {
   sched.jobs.length = 0;

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { testDb, pid } from "./helpers/testdb";
+import { testDb, pid, installTestDb } from "./helpers/testdb";
 import { signSession } from "../src/lib/auth/session";
 import { runPipeline } from "../src/lib/pipeline/run";
 import { publishedAt } from "../src/lib/pipeline/persist";
@@ -18,7 +18,7 @@ let eqsBrief = "";   // published; belongs to the EQS desk (Kessler's)
 let route: typeof import("../src/app/api/qc/[briefId]/route");
 
 beforeAll(async () => {
-  (globalThis as unknown as { __mbDb?: Promise<unknown> }).__mbDb = testDb();
+  installTestDb();
   const db = await testDb();
   // six people on two desks; the simulated reviewer holds one brief so both paths can be exercised
   const profileIds = await Promise.all(["okafor", "raman", "marchetti", "whitfield", "rahman", "fontaine"].map(pid));
