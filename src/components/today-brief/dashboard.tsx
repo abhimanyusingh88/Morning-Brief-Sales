@@ -19,24 +19,37 @@ const etHM = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: 
 /** ------------------------------------------------------------------ hero */
 export function Hero({ first, dateLabel, stamp, coverage, oneLine, facts }: { first: string; dateLabel: string; stamp: string; coverage: React.ReactNode; oneLine?: string; facts: Facts }) {
   return (
-    <header className="relative overflow-hidden rounded-[12px] bg-navy px-6 py-6 text-white sm:px-8 sm:py-7 [&_.fact]:border-white/35! [&_.fact:hover]:bg-white/15!">
-      <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-72 w-72 rounded-full bg-brand/40 blur-3xl" />
-      <div className="relative">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/60">
-          <span className="flex items-center gap-1.5 rounded-full bg-cyan/15 px-2.5 py-1 font-medium text-cyan">
-            <span className="h-1.5 w-1.5 rounded-full bg-cyan" />
-            Pre-open brief
-          </span>
-          <span className="num">{dateLabel}</span>
-          <span aria-hidden>·</span>
-          <span className="num">{stamp}</span>
+    <header className="relative rounded-xl border border-slate-800 bg-slate-900 px-6 py-6 text-white shadow-sm sm:px-8 sm:py-7 [&_.fact]:border-slate-500/70! [&_.fact]:text-slate-100! [&_.fact:hover]:bg-slate-800! [&_.fact:hover]:text-white!">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+          <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-400">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+              Pre-open brief
+            </span>
+            <span className="font-mono text-slate-300">{dateLabel}</span>
+            <span className="text-slate-600">•</span>
+            <span className="font-mono text-slate-400">{stamp}</span>
+          </div>
         </div>
-        <h1 className="mt-4 text-[28px] font-semibold leading-tight tracking-[-0.025em] sm:text-[32px]">Good morning, {first}.</h1>
-        <p className="mt-1.5 text-[13px] text-white/65">{coverage}</p>
+
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            Good morning, {first}.
+          </h1>
+          <p className="mt-1.5 text-sm text-slate-300 leading-relaxed">
+            {coverage}
+          </p>
+        </div>
+
         {oneLine ? (
-          <div className="mt-5 rounded-[10px] border border-white/10 bg-white/[0.06] px-4 py-3.5">
-            <p className="mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-cyan">The open in one line</p>
-            <p className="mt-1 text-[15px] leading-relaxed text-white/90"><Tpl t={oneLine} facts={facts} /></p>
+          <div className="mt-2 rounded-lg border border-slate-800 border-l-4 border-l-blue-500 bg-slate-950/70 p-4">
+            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              <span>The Open in One Line</span>
+            </div>
+            <p className="mt-1.5 text-sm sm:text-[15px] font-medium leading-relaxed text-slate-100">
+              <Tpl t={oneLine} facts={facts} />
+            </p>
           </div>
         ) : null}
       </div>

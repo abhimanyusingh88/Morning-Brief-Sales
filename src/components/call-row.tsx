@@ -11,19 +11,41 @@ export function firstSentence(t: string) {
 }
 
 export function CallRow({ c, facts, href, active }: { c: CardRow; facts: Record<string, FactView>; href: string; active?: boolean }) {
+  const snippet = firstSentence(c.whyTemplate);
+  const showSnippet = snippet && snippet.toLowerCase() !== c.headline.toLowerCase();
+
   return (
-    <Link href={href} className={cn("group flex items-start gap-3.5 px-5 py-3.5 transition-colors hover:bg-sunken/70", active && "bg-brand-50 hover:bg-brand-50")}>
-      <span className={cn("num mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[12px] font-semibold", c.urgency === "now" ? "bg-amber-50 text-amber" : "bg-sunken text-muted")}>{c.rank}</span>
-      <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className={cn("truncate text-[14px] font-semibold text-ink", c.status === "done" && "text-subtle line-through")}>{c.clientName}</span>
-          <UrgencyBadge urgency={c.urgency} />
-          {c.status === "done" ? <Badge tone="up">Done</Badge> : c.status === "snoozed" ? <Badge tone="neutral">Snoozed</Badge> : null}
-        </span>
-        <span className="mt-0.5 line-clamp-2 block text-[13px] font-medium leading-snug text-ink-2">{c.headline}</span>
-        <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-snug text-muted"><RichText template={firstSentence(c.whyTemplate)} facts={facts} /></span>
+    <Link
+      href={href}
+      className={cn(
+        "group relative flex items-start gap-3 border-l-2 px-4 py-3 transition-colors",
+        active
+          ? "border-l-brand bg-slate-50/90 shadow-sm"
+          : "border-l-transparent hover:bg-slate-50/50"
+      )}
+    >
+      <span className="num mt-0.5 text-xs font-mono font-medium text-slate-400 w-4 text-center shrink-0">
+        {c.rank}
       </span>
-      <ChevronRight size={16} className="mt-1 shrink-0 text-line-strong transition group-hover:translate-x-0.5 group-hover:text-brand" />
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className={cn("truncate text-[13.5px] font-semibold text-slate-900", c.status === "done" && "text-slate-400 line-through")}>
+            {c.clientName}
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <UrgencyBadge urgency={c.urgency} />
+            {c.status === "done" ? <Badge tone="up">Done</Badge> : c.status === "snoozed" ? <Badge tone="neutral">Snoozed</Badge> : null}
+          </div>
+        </div>
+        <p className="line-clamp-1 text-[13px] font-medium leading-snug text-slate-700">
+          {c.headline}
+        </p>
+        {showSnippet ? (
+          <p className="line-clamp-1 text-[12px] leading-snug text-slate-500">
+            <RichText template={snippet} facts={facts} />
+          </p>
+        ) : null}
+      </div>
     </Link>
   );
 }

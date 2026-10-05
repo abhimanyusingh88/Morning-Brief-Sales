@@ -75,14 +75,35 @@ body {
 .fact {
   font-variant-numeric: tabular-nums;
   font-weight: 550;
-  border-bottom: 1px dotted var(--color-line-strong);
+  border-bottom: 1px dotted rgba(33, 53, 71, 0.25);
   cursor: help;
   white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 .fact:hover, .fact[data-state="open"] { background: var(--color-brand-50); border-bottom-color: var(--color-brand); }
 
-.scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: var(--color-line-strong); border-radius: 8px; }
+/* Hide all scrollbar appearances globally while preserving scroll functionality */
+* {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.scroll-thin,
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scroll-thin::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
 
 @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
 .skeleton {

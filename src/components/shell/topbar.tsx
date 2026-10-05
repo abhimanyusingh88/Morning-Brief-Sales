@@ -1,7 +1,6 @@
 import { Search } from "lucide-react";
 import { UserMenu } from "./user-menu";
 import { SearchTrigger } from "./command-palette";
-import { AskButton } from "./chat-drawer";
 import type { Me } from "@/lib/auth/session";
 import { MobileNav } from "./mobile-nav";
 
@@ -15,7 +14,6 @@ export function Topbar({ me, hue, asOf, sources, firm }: { me: Me; hue: number; 
           <span className="live-dot h-1.5 w-1.5 rounded-full bg-up" />
           <span>Data as of <span className="num font-medium text-ink-2">{asOf}</span></span>
         </div>
-        {me.role === "sales" || me.role === "desk_head" ? <AskButton /> : null}
         <UserMenu name={me.fullName} title={me.title} initials={me.initials} hue={hue} />
       </div>
     </header>

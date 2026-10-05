@@ -17,18 +17,28 @@ export function CardActions({ id, status, clientName }: { id: string; status: st
     router.refresh();
   });
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2.5 pt-3 border-t border-slate-100">
       {status === "done" || status === "dismissed" || status === "snoozed" ? (
-        <Button variant="secondary" onClick={() => set("new")} disabled={pending}><RotateCcw size={14} /> Reopen</Button>
+        <Button variant="secondary" size="sm" onClick={() => set("new")} disabled={pending} className="gap-1.5 text-xs font-medium">
+          <RotateCcw size={13} /> Reopen call
+        </Button>
       ) : (
         <>
-          <Button variant="primary" onClick={() => set("done")} disabled={pending}><Check size={15} /> Mark as called</Button>
-          <Button variant="secondary" onClick={() => set("snoozed")} disabled={pending}><Clock size={14} /> Snooze</Button>
-          <Button variant="ghost" onClick={() => set("dismissed")} disabled={pending}><EyeOff size={14} /> Not today</Button>
+          <Button variant="primary" size="sm" onClick={() => set("done")} disabled={pending} className="gap-1.5 text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white shadow-xs">
+            <Check size={14} /> Mark as called
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => set("snoozed")} disabled={pending} className="gap-1.5 text-xs font-medium text-slate-700">
+            <Clock size={13} /> Snooze
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => set("dismissed")} disabled={pending} className="gap-1.5 text-xs text-slate-500 hover:text-slate-800">
+            <EyeOff size={13} /> Not today
+          </Button>
         </>
       )}
-      <Button variant="secondary" onClick={() => ask(`Draft an email to ${clientName}`)} className="ml-auto"><Mail size={14} /> Draft a note</Button>
-      {err ? <p role="alert" className="w-full text-xs text-down">{err}</p> : null}
+      <Button variant="secondary" size="sm" onClick={() => ask(`Draft an email to ${clientName}`)} className="ml-auto gap-1.5 text-xs font-medium text-slate-800">
+        <Mail size={13} strokeWidth={1.75} /> Draft a note
+      </Button>
+      {err ? <p role="alert" className="w-full text-xs text-red-600 mt-1">{err}</p> : null}
     </div>
   );
 }

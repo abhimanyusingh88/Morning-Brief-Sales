@@ -12,7 +12,6 @@ export const NAV: { group: string; items: NavItem[] }[] = [
       { href: "/brief", label: "Morning brief", icon: BookOpenText, roles: ["sales"] },
       { href: "/calls", label: "Call list", icon: PhoneCall, roles: ["sales"] },
       { href: "/clients", label: "Clients", icon: Users, roles: ["sales", "desk_head"] },
-      { href: "/agent", label: "Agent", icon: MessageSquareText, roles: ["sales", "desk_head"] },
     ],
   },
   {

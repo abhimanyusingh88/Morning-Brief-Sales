@@ -52,11 +52,23 @@ export default async function TodayBriefPage() {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[13px] text-muted">Dashboard view for <b className="font-semibold text-ink">{me.fullName}</b></p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted">
+          Dashboard view <span className="normal-case font-semibold text-ink ml-1">• {me.fullName}</span>
+        </p>
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="ghost" size="sm"><Link href="/brief"><BookOpenText size={14} strokeWidth={1.5} /> Read as document</Link></Button>
-          <Button asChild variant="secondary" size="sm"><Link href="/setup"><SlidersHorizontal size={14} strokeWidth={1.5} /> Edit preferences</Link></Button>
+          <Button asChild variant="secondary" size="sm" className="h-8 text-xs">
+            <Link href="/brief" className="inline-flex items-center gap-1.5">
+              <BookOpenText size={14} strokeWidth={1.75} />
+              <span>Read as document</span>
+            </Link>
+          </Button>
+          <Button asChild variant="secondary" size="sm" className="h-8 text-xs">
+            <Link href="/setup" className="inline-flex items-center gap-1.5">
+              <SlidersHorizontal size={14} strokeWidth={1.75} />
+              <span>Edit preferences</span>
+            </Link>
+          </Button>
         </div>
       </div>
 
