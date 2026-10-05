@@ -12,7 +12,7 @@ This repo is the proof-of-concept build: real pipeline, real database, synthetic
    `db.asService()` is for the pipeline and admin routes only. Never pass client data to a model
    that was read through `asService`.
 3. **Every value carries source and timestamp** (`market_quotes.source/as_of`, fact `source/as_of`).
-4. **Equity index moves are percent. Yields and spreads are basis points.** Never mix.
+4. **Units are fixed per instrument type.** Stock, sector and commodity moves are percent. Yields and credit spreads are basis points. Equity *index* moves in the markets snapshot are basis points, as the Build Specification (3.1) and the sample brief show; VIX is level plus percent. Never mix units within an instrument type.
 5. **The agent drafts; the human sends.** No code path sends anything to a client.
 6. **No real publisher names, no Bloomberg marks, no real people.** Simulated headlines are marked
    `simulated = true` and carry a generic source label.

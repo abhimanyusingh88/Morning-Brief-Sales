@@ -1,13 +1,8 @@
-import { createHash } from "node:crypto";
+import { uid } from "../util/id";
 import type { Q } from "../db/types";
 import { getMarketProvider } from "../market";
 import type { InstrumentRef } from "../market/types";
 import { defaultScenarios, scenarioByKey } from "../market/scenarios";
-
-const uid = (seed: string) => {
-  const h = createHash("md5").update(seed).digest("hex");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
-};
 
 export async function loadInstrumentRefs(q: Q): Promise<InstrumentRef[]> {
   const rows = await q(`select i.id, i.symbol, i.name, i.asset_class, i.sector, i.unit, i.decimals, (i.meta->>'vol')::float8 vol,

@@ -45,7 +45,7 @@ export function triggersForClient(s: Snapshot, client: ClientInfo): Trigger[] {
     groups.set(g, cur);
   }
 
-  const todaysEvents = s.events.filter((e) => e.businessDate === s.businessDate && e.kind !== "earnings" && !(e.instrumentId && s.restrictedInstrumentIds.has(e.instrumentId)));
+  const todaysEvents = s.events.filter((e) => e.businessDate === s.businessDate && e.kind !== "earnings" && e.kind !== "corporate_action" && !(e.instrumentId && s.restrictedInstrumentIds.has(e.instrumentId)));
   // Scheduled calendar items (CPI, auctions) are "ahead" triggers; narrative events explain moves.
   const narrative = todaysEvents.filter((e) => e.sourceLabel !== CALENDAR_LABEL);
 

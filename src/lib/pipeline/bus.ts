@@ -1,6 +1,12 @@
 /** In-process fan-out of pipeline progress, so the monitor can stream a run as it happens. */
+import type { FeedState } from "../feeds/connectors";
+
 export interface StepState {
   seq: number;
+  /** 1 to 5, matching the specification's pipeline table */
+  stage: number;
+  /** the simulated New York clock at which this step starts (the run is a time-lapse of the morning) */
+  simAt: string;
   key: string;
   label: string;
   status: "pending" | "running" | "succeeded" | "failed" | "skipped";
@@ -15,6 +21,7 @@ export interface StepState {
 export type PipelineEvent =
   | { type: "run"; runId: string; businessDate: string; status: "running" | "succeeded" | "failed"; steps: StepState[] }
   | { type: "step"; runId: string; step: StepState }
+  | { type: "feed"; runId: string; feed: FeedState }
   | { type: "log"; runId: string; key: string; line: string; at: string }
   | { type: "done"; runId: string; status: "succeeded" | "failed"; summary: Record<string, unknown> };
 

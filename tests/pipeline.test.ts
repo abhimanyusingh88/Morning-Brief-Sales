@@ -12,7 +12,7 @@ describe("pipeline run", () => {
     expect(r.summary.error).toBeUndefined();
     expect(r.status).toBe("succeeded");
     const steps = await db.asService((q) => q<{ key: string; status: string; log: string[] }>(`select key, status, log from pipeline_steps where run_id = $1 order by seq`, [r.runId]));
-    expect(steps.length).toBe(13);
+    expect(steps.length).toBe(17);
     expect(steps.every((s) => s.status === "succeeded")).toBe(true);
     expect(steps[0].log.length).toBeGreaterThan(0);
 

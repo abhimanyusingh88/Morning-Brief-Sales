@@ -8,5 +8,7 @@ export interface Db {
   asUser<T>(profileId: string, fn: (q: Q) => Promise<T>): Promise<T>;
   /** Pipeline / admin only. Bypasses row-level security. */
   asService<T>(fn: (q: Q) => Promise<T>): Promise<T>;
+  /** Apply any migrations in supabase/migrations that have not run yet. Returns the file names applied. */
+  migrate?(): Promise<string[]>;
   close(): Promise<void>;
 }

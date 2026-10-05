@@ -41,7 +41,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         }
         const rows = await db.asService((q) => q(`select seq, key, label, status, started_at, finished_at, rows_in, rows_out, detail, log from pipeline_steps where run_id = $1 order by seq`, [id]));
         const steps: StepState[] = rows.map((r) => ({
-          seq: Number(r.seq), key: String(r.key), label: String(r.label), status: r.status as StepState["status"],
+          seq: Number(r.seq), stage: Number((r.detail as Record<string, unknown>)?.stage ?? 1), simAt: String((r.detail as Record<string, unknown>)?.simAt ?? "04:00"), key: String(r.key), label: String(r.label), status: r.status as StepState["status"],
           startedAt: r.started_at ? new Date(r.started_at as string).toISOString() : null, finishedAt: r.finished_at ? new Date(r.finished_at as string).toISOString() : null,
           rowsIn: r.rows_in as number | null, rowsOut: r.rows_out as number | null, detail: (r.detail as Record<string, unknown>) ?? {}, log: (r.log as string[]) ?? [],
         }));

@@ -3,6 +3,7 @@
 @theme inline {
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-serif: "Instrument Serif", "Iowan Old Style", Georgia, serif;
 
   --color-bg: #f5f6f8;
   --color-surface: #ffffff;
@@ -30,6 +31,14 @@
   --color-down-50: #fbeceb;
   --color-amber: #d9870b;
   --color-amber-50: #fdf3df;
+
+  /* The brief itself reads like a printed note: warm paper, a serif title, mono figures. */
+  --color-paper: #f6f4ef;
+  --color-paper-2: #efece4;
+  --color-paper-line: #e3ded1;
+  --color-gold: #9a6b12;
+  --color-callout: #f2e5c4;
+  --color-callout-line: #e6d4a0;
 
   --radius-card: 12px;
   --shadow-card: 0 1px 2px rgba(14, 22, 39, 0.04), 0 1px 1px rgba(14, 22, 39, 0.03);
@@ -81,3 +90,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .skeleton, .live-dot, .rise { animation: none; }
 }
+
+/* ---- shared patterns (shell) ---- */
+.serif { font-family: var(--font-serif); }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-subtle); }
+.hairline { border-color: var(--color-line); }

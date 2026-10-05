@@ -1,16 +1,25 @@
-import type { Db, Q } from "../db/types";
+import type { Db } from "../db/types";
+import { cachedCompleter } from "../ai/cache";
 import { llmConfigured, modelName } from "../ai/gateway";
 import { writeBrief, writeCard, type WriteRecord } from "../ai/llm-writer";
-import { prepareProfile, type Prepared } from "../ai/prepare";
-import { templateBrief, templateCard, type BriefText, type CardText } from "../ai/templates";
+import { prepareProfile, forbiddenTerms, type Prepared } from "../ai/prepare";
+import { templateBrief, templateCard } from "../ai/templates";
 import { validateText } from "../ai/validator";
-import { defaultScenarios, scenarioByKey } from "../market/scenarios";
+import { buildPersonal, buildUniversal, type BuiltSection, type FeedHealth, type Universal, sectionPosition } from "../brief/build";
+import { narrativeSection, templateNarrative, writeNarrative, type Narrative } from "../brief/narrative";
+import { loadAllPrefs } from "../brief/prefs";
+import type { BriefPrefs } from "../brief/spec";
+import { runFeeds, type FeedState, type Outage } from "../feeds/connectors";
+import { classifyHeadline } from "../feeds/content";
+import { defaultScenarios } from "../market/scenarios";
 import { publish, type StepState } from "./bus";
-import { ingestMarket, ingestNews } from "./ingest";
-import { suppressedByBarrier, CALENDAR_LABEL } from "./match";
+import { deliver, type DeliveryItem } from "./deliver";
+import { suppressedByBarrier } from "./match";
+import { persistDraft, publishedAt, type CardOut, type ProfileOut } from "./persist";
+import { automatedChecks, pickSample, simulatedSpotCheck, universalHash, type QcSubject } from "./qc";
 import { buildCandidates, selectCards } from "./rank";
-import { loadSnapshot } from "./snapshot";
 import { WEIGHTS } from "./score";
+import { loadSnapshot } from "./snapshot";
 import type { Candidate, Snapshot } from "./types";
 
 export interface RunOptions {
@@ -24,24 +33,45 @@ export interface RunOptions {
   profileIds?: string[];
   /** minimum visible time per step, so a live demo run is watchable */
   minStepMs?: number;
+  /** pace the run as a time-lapse of the morning (connectors finish one after another, steps hold their share of the clock) */
+  timelapse?: boolean;
+  /** simulate feed problems: the affected sections are withheld with "data temporarily unavailable" */
+  outages?: Record<string, Outage>;
+  /** the simulated spot-check reviewer holds one brief, so the hold-and-release path can be shown */
+  qcFlag?: boolean;
+  /** ignore stored model output and call the model again */
+  bypassCache?: boolean;
   runId?: string;
 }
 
-export const STEPS = [
-  ["ingest_market", "Ingest pre-market tape"],
-  ["ingest_calendar", "Load macro and earnings calendar"],
-  ["ingest_news", "Ingest newswire"],
-  ["entitlement_filter", "Apply entitlements and information barrier"],
-  ["tag_events", "Tag events to sectors and themes"],
-  ["match_book", "Match events to each client's book"],
-  ["score_rank", "Score client opportunities"],
-  ["rank_select", "Select each salesperson's call list"],
-  ["build_facts", "Build the fact book (source and timestamp on every figure)"],
-  ["generate_brief", "Write morning briefs"],
-  ["generate_cards", "Write call cards and talking points"],
-  ["validate", "Validate every number and name in generated text"],
-  ["publish", "Publish briefs"],
+/** The five stages of the specification's pipeline table, with the simulated New York clock each starts at. */
+export const STAGES = [
+  { n: 1, simAt: "04:00", name: "Data ingestion", detail: "Pull all data feeds" },
+  { n: 2, simAt: "04:30", name: "Tagging and matching", detail: "Match tagged content to each saved profile" },
+  { n: 3, simAt: "05:00", name: "Narrative generation", detail: "Catalysts, one-line summary, call cards" },
+  { n: 4, simAt: "05:30", name: "QC review", detail: "Automated checks and a human spot-check" },
+  { n: 5, simAt: "06:30", name: "Delivery", detail: "Publish the dashboard, send the email digest" },
 ] as const;
+
+export const STEPS: readonly (readonly [string, string, number, string])[] = [
+  ["ingest_feeds", "Pull every data feed", 1, "04:00"],
+  ["entitlement_filter", "Apply entitlements and the information barrier", 2, "04:30"],
+  ["tag_events", "Tag content to sector, ticker and product", 2, "04:33"],
+  ["load_preferences", "Load each salesperson's saved setup", 2, "04:36"],
+  ["match_book", "Match events to each client's book", 2, "04:39"],
+  ["score_rank", "Score client opportunities", 2, "04:42"],
+  ["rank_select", "Select each salesperson's call list", 2, "04:45"],
+  ["build_facts", "Build the fact book (source and timestamp on every figure)", 3, "05:00"],
+  ["compose_sections", "Compose each brief from the day's tagged content", 3, "05:04"],
+  ["narrative", "Write the Catalysts section and the one-line summary", 3, "05:08"],
+  ["generate_brief", "Write the call-list briefs", 3, "05:12"],
+  ["generate_cards", "Write call cards and talking points", 3, "05:16"],
+  ["validate", "Validate every number and name in generated text", 4, "05:24"],
+  ["persist", "Store the drafts", 4, "05:27"],
+  ["qc_review", "QC review: automated checks and spot-check", 4, "05:30"],
+  ["publish", "Publish dashboards", 5, "06:30"],
+  ["deliver", "Send email digests", 5, "06:31"],
+];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -54,24 +84,35 @@ async function pool<T, R>(items: T[], n: number, fn: (x: T, i: number) => Promis
   return out;
 }
 
-interface CardOut { ctx: Prepared["cards"][number]; text: CardText; generator: string; record: WriteRecord | null }
-interface ProfileOut { prep: Prepared; cards: CardOut[]; brief: BriefText; briefGen: Record<string, string>; briefRecord: WriteRecord | null }
+const CALL_LIST_KINDS = ["book", "flow", "risks"];
 
 export async function runPipeline(o: RunOptions): Promise<{ runId: string; status: "succeeded" | "failed"; summary: Record<string, unknown> }> {
   const { db, businessDate } = o;
   const useLlm = (o.useLlm ?? true) && llmConfigured();
   const started = Date.now();
+  const minStep = o.minStepMs ?? (o.timelapse ? 3600 : 0);
+  const complete = useLlm ? cachedCompleter(db, { bypass: o.bypassCache }) : undefined;
 
   const runId = (await db.asService((q) =>
     q<{ id: string }>(`insert into pipeline_runs (id, business_date, trigger, scope, status) values (coalesce($4::uuid, gen_random_uuid()), $1, $2, $3, 'running') returning id`,
       [businessDate, o.trigger ?? "manual", o.profileIds ? "subset" : "all", o.runId ?? null]),
   ))[0].id;
 
-  const steps: StepState[] = STEPS.map(([key, label], i) => ({ seq: i + 1, key, label, status: "pending", startedAt: null, finishedAt: null, rowsIn: null, rowsOut: null, detail: {}, log: [] }));
-  await db.asService((q) => q(
-    `insert into pipeline_steps (run_id, seq, key, label) select $1, (x->>'seq')::int, x->>'key', x->>'label' from jsonb_array_elements($2::jsonb) x`,
-    [runId, JSON.stringify(steps.map((s) => ({ seq: s.seq, key: s.key, label: s.label })))],
-  ));
+  const steps: StepState[] = STEPS.map(([key, label, stage, simAt], i) => ({ seq: i + 1, stage, simAt, key, label, status: "pending", startedAt: null, finishedAt: null, rowsIn: null, rowsOut: null, detail: { stage, simAt }, log: [] }));
+  try {
+    await db.asService((q) => q(
+      `insert into pipeline_steps (run_id, seq, key, label, detail) select $1, (x->>'seq')::int, x->>'key', x->>'label', jsonb_build_object('stage', (x->>'stage')::int, 'simAt', x->>'simAt') from jsonb_array_elements($2::jsonb) x`,
+      [runId, JSON.stringify(steps.map((s) => ({ seq: s.seq, key: s.key, label: s.label, stage: s.stage, simAt: s.simAt })))],
+    ));
+  } catch (e) {
+    // Never leave a run "running" forever: record why it could not start.
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[pipeline ${runId.slice(0, 8)}] could not start: ${msg}`);
+    const summary = { businessDate, error: `could not start: ${msg}` };
+    await db.asService((q) => q(`update pipeline_runs set status='failed', finished_at=now(), summary=$2::jsonb where id=$1`, [runId, JSON.stringify(summary)])).catch(() => {});
+    publish(runId, { type: "done", runId, status: "failed", summary });
+    return { runId, status: "failed", summary };
+  }
   publish(runId, { type: "run", runId, businessDate, status: "running", steps: structuredClone(steps) });
 
   // Writes are chained so an older snapshot of a step can never overwrite a newer one.
@@ -92,13 +133,13 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
     publish(runId, { type: "step", runId, step: structuredClone(s) });
     const t0 = Date.now();
     const tag = `[pipeline ${runId.slice(0, 8)}]`;
-    console.log(`${tag} ▶ ${s.label}`);
+    console.log(`${tag} ▶ ${s.simAt} ET ${s.label}`);
     const log = (line: string) => { s.log.push(line); void persist(s); console.log(`${tag}   ${line}`); publish(runId, { type: "log", runId, key, line, at: new Date().toISOString() }); };
     const set = (p: Partial<Pick<StepState, "rowsIn" | "rowsOut" | "detail">>) => Object.assign(s, p);
     try {
       const r = await fn(log, set);
       const realMs = Date.now() - t0;
-      const wait = (o.minStepMs ?? 0) - (Date.now() - t0);
+      const wait = minStep - (Date.now() - t0);
       if (wait > 0) await sleep(wait);
       s.status = "succeeded";
       s.finishedAt = new Date().toISOString();
@@ -117,33 +158,35 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
     }
   }
 
-  const summary: Record<string, unknown> = { businessDate, llm: useLlm };
+  const summary: Record<string, unknown> = { businessDate, llm: useLlm, timelapse: Boolean(o.timelapse) };
   try {
     const scenarios = o.scenarios?.length ? o.scenarios : defaultScenarios(businessDate);
     summary.scenarios = scenarios;
+    const health: FeedHealth = {};
+    let feedStates: FeedState[] = [];
 
-    await step("ingest_market", async (log, set) => {
-      const r = await db.asService((q) => ingestMarket(q, businessDate, scenarios));
-      log(`Provider ${r.provider}: ${r.rows} instruments quoted`);
-      log(`${r.moverCount} instruments moved beyond one normal daily range; leaders ${r.movers.join(", ")}`);
-      set({ rowsOut: r.rows, detail: { provider: r.provider, movers: r.movers } });
+    // ---------------------------------------------------------------- stage 1: data ingestion (04:00)
+    await step("ingest_feeds", async (log, set) => {
+      log(`Opening ${14} connectors in parallel (${Object.keys(o.outages ?? {}).length ? `simulated outage on ${Object.keys(o.outages ?? {}).join(", ")}` : "all healthy"})`);
+      const s = steps.find((x) => x.key === "ingest_feeds")!;
+      feedStates = await runFeeds({
+        db, runId, businessDate, scenarios, outages: o.outages,
+        pace: o.timelapse ? async (_k, i) => { await sleep(150 + i * 330); } : undefined,
+        onUpdate: (f) => {
+          publish(runId, { type: "feed", runId, feed: f });
+          if (f.status !== "running" && f.finishedAt) s.detail = { ...s.detail, feeds: { ...(s.detail.feeds as Record<string, string> | undefined), [f.feedKey]: f.status } };
+        },
+      });
+      for (const f of feedStates) { health[f.feedKey] = f.status; log(`${f.feedKey.padEnd(14)} ${f.status.toUpperCase().padEnd(8)} ${f.rows.toLocaleString("en-US").padStart(6)} rows · ${f.latencyMs} ms${f.status !== "ok" ? ` · ${String(f.detail.error ?? "")}` : ""}`); }
+      const ok = feedStates.filter((f) => f.status === "ok").length;
+      const bad = feedStates.filter((f) => f.status !== "ok");
+      log(`${ok} of ${feedStates.length} feeds healthy${bad.length ? `; ${bad.map((b) => b.feedKey).join(", ")} will be withheld from briefs: data temporarily unavailable` : ""}`);
+      set({ rowsOut: feedStates.reduce((a, f) => a + f.rows, 0), detail: { feeds: Object.fromEntries(feedStates.map((f) => [f.feedKey, f.status])) } });
+      summary.feeds = { ok, down: bad.length };
     });
 
-    await step("ingest_calendar", async (log, set) => {
-      const r = await db.asService((q) => q<{ kind: string; n: number }>(
-        `select kind, count(*)::int n from events where source_label = $2 and business_date between $1::date and $1::date + 1 group by kind`, [businessDate, CALENDAR_LABEL]));
-      for (const x of r) log(`${x.n} ${x.kind} items on the calendar`);
-      set({ rowsOut: r.reduce((a, b) => a + b.n, 0), detail: { source: CALENDAR_LABEL } });
-    });
-
-    await step("ingest_news", async (log, set) => {
-      const r = await db.asService((q) => ingestNews(q, businessDate, scenarios));
-      for (const k of scenarios) { const sc = scenarioByKey(k); if (sc) log(`Storyline: ${sc.label}`); }
-      log(`${r.events} items from the newswire`);
-      set({ rowsOut: r.events });
-    });
-
-    const snap: Snapshot = await step("entitlement_filter", async (log, set) => {
+    // ---------------------------------------------------------------- stage 2: tagging and matching (04:30)
+    let snap: Snapshot = await step("entitlement_filter", async (log, set) => {
       const s = await db.asService((q) => loadSnapshot(q, businessDate));
       const barred = suppressedByBarrier(s);
       log(`${s.events.length} public events cleared for distribution`);
@@ -154,11 +197,34 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
     });
 
     await step("tag_events", async (log, set) => {
+      // Items the aggregator delivered without sector or product tags are classified here, by rule.
+      const raw = await db.asService((q) => q<{ id: string; title: string }>(`select id, title from events where business_date = $1 and payload->>'untagged' = 'true'`, [businessDate]));
+      let fixed = 0;
+      for (const e of raw) {
+        const c = classifyHeadline(e.title);
+        if (!c) { log(`no rule matched: "${e.title.slice(0, 60)}"; left untagged`); continue; }
+        await db.asService((q) => q(`update events set sector = $2, tags = $3::text[], products = $4::text[], payload = payload - 'untagged' || jsonb_build_object('tagged_by', 'rules v1') where id = $1`, [e.id, c.sector, c.tags, c.products]));
+        fixed++;
+        log(`tagged "${e.title.slice(0, 54)}${e.title.length > 54 ? "…" : ""}" → ${c.sector ?? "market-wide"} · ${c.products.slice(0, 2).join(", ")}`);
+      }
+      snap = await db.asService((q) => loadSnapshot(q, businessDate));
       const by = new Map<string, number>();
       for (const e of snap.events) by.set(e.sector ?? "Macro", (by.get(e.sector ?? "Macro") ?? 0) + 1);
       const top = [...by.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => `${k} (${n})`).join(", ");
-      log(`Tagged ${snap.events.length} events across ${by.size} sectors and themes: ${top}`);
-      set({ rowsIn: snap.events.length, rowsOut: snap.events.length });
+      log(`${fixed} untagged headlines classified; ${snap.events.length} events carry sector, ticker and product tags: ${top}`);
+      set({ rowsIn: raw.length, rowsOut: snap.events.length, detail: { classified: fixed } });
+    });
+
+    const everyone = [...new Set([...snap.coverage.values()].flat())];
+    const prefsMap: Map<string, BriefPrefs> = await step("load_preferences", async (log, set) => {
+      const ids = o.profileIds ?? everyone;
+      const m = await loadAllPrefs(db, businessDate, ids);
+      const custom = [...m.values()].filter((p) => p.effectiveFrom !== "default").length;
+      const email = [...m.values()].filter((p) => p.delivery !== "dashboard").length;
+      log(`${m.size} saved setups in force on ${businessDate} (${custom} edited by the user, ${m.size - custom} desk defaults); changes saved today apply from the next business day`);
+      log(`${email} salespeople receive an email digest; ${m.size - email} dashboard only`);
+      set({ rowsOut: m.size });
+      return m;
     });
 
     const cands: Candidate[] = await step("match_book", async (log, set) => {
@@ -183,7 +249,6 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
       log(`${n} calls selected for ${sel.size} salespeople (per-story cap keeps lists varied)`);
       const now = [...sel.values()].flat().filter((c) => c.urgency === "now").length;
       log(`${now} flagged to call now`);
-      // persist the ranked signals behind each list
       await db.asService(async (q) => {
         await q(`delete from signals where business_date = $1`, [businessDate]);
         const rows = [...sel.values()].flat().map((c) => ({ p: c.profileId, c: c.clientId, e: c.primary.trigger.eventIds[0] ?? null, k: c.primary.trigger.kind, s: c.score, f: c.primary.factors }));
@@ -196,11 +261,12 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
       return sel;
     });
 
-    const names = new Map((await db.asService((q) => q<{ id: string; full_name: string }>(`select id, full_name from profiles`))).map((p) => [p.id, p.full_name.split(" ")[0]]));
+    const people = new Map((await db.asService((q) => q<{ id: string; full_name: string; email: string }>(`select id, full_name, email from profiles`))).map((p) => [p.id, { first: p.full_name.split(" ")[0], full: p.full_name, email: p.email }]));
 
+    // ---------------------------------------------------------------- stage 3: narrative generation (05:00)
     const prepared: Prepared[] = await step("build_facts", async (log, set) => {
       const list = await pool([...selected.entries()], 4, ([profileId, picks]) =>
-        prepareProfile({ db, snap, profileId, firstName: names.get(profileId) ?? "there", picks }));
+        prepareProfile({ db, snap, profileId, firstName: people.get(profileId)?.first ?? "there", picks }));
       const facts = list.reduce((a, p) => a + p.facts.keys().length, 0);
       log(`Client detail read under each salesperson's own permissions (row-level security)`);
       log(`${facts} facts registered, each with source and as-of time`);
@@ -208,18 +274,75 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
       return list;
     });
 
-    const outs: ProfileOut[] = prepared.map((prep) => ({ prep, cards: [], brief: templateBrief(prep.brief), briefGen: {}, briefRecord: null }));
+    const outs: ProfileOut[] = prepared.map((prep) => ({ prep, cards: [], brief: templateBrief(prep.brief), briefGen: {}, briefRecord: null, spec: [] }));
+    for (const po of outs) po.brief.sections = po.brief.sections.filter((s) => CALL_LIST_KINDS.includes(s.kind));
+
+    let universal!: Universal;
+    await step("compose_sections", async (log, set) => {
+      universal = await buildUniversal(db, businessDate, health);
+      const u = universal;
+      const uni = [...u.sections.values()];
+      log(`Universal sections built once for everyone: ${uni.map((s) => s.kind).join(", ")}`);
+      const withheld = uni.filter((s) => s.status === "unavailable");
+      if (withheld.length) log(`Withheld (feed not healthy): ${withheld.map((s) => s.title).join(", ")}: data temporarily unavailable`);
+      let total = 0, omitted = 0;
+      await pool(outs, 4, async (po) => {
+        const prefs = prefsMap.get(po.prep.profileId);
+        if (!prefs) return;
+        for (const f of u.fb.all()) if (!po.prep.facts.has(f.key)) po.prep.facts.add(f);
+        const list: BuiltSection[] = [];
+        for (const k of ["snapshot", "chart"]) { const s = u.sections.get(k); if (s) list.push(s); }
+        if (prefs.include.sector_lead_lag) { const s = u.sections.get("sector_lead_lag"); if (s) list.push(s); }
+        const personal = await buildPersonal(db, { u, snap, prefs, profileId: po.prep.profileId, fb: po.prep.facts });
+        list.push(...personal);
+        po.spec = list;
+        total += list.length;
+        omitted += ["overnight", "movers", "earnings", "news", "dividends", "index_rebalance"].filter((k) => prefs.include[k as keyof BriefPrefs["include"]] && !personal.some((p) => p.kind === k)).length;
+      });
+      log(`${total} sections composed for ${outs.length} salespeople; ${omitted} personalised sections omitted because nothing matched (no empty boxes)`);
+      set({ rowsIn: outs.length, rowsOut: total });
+    });
+
+    let narrative!: Narrative;
+    await step("narrative", async (log, set) => {
+      const forbidden = forbiddenTerms(snap);
+      narrative = useLlm ? await writeNarrative(universal, forbidden, { complete, db }) : templateNarrative(universal);
+      const rec: WriteRecord | null = narrative.record;
+      const catalysts = narrativeSection(narrative);
+      const catRequired = ["mkt_snapshot", "futures_rates"];
+      const down = catRequired.filter((f) => (health[f] ?? "ok") !== "ok");
+      if (down.length) {
+        log(`Catalysts withheld: ${down.join(", ")} not available. Data temporarily unavailable.`);
+        const sec: BuiltSection = { ...catalysts, status: "unavailable", note: "Data temporarily unavailable.", template: "", data: { oneLine: "", withheldBecause: down }, generator: "code" };
+        universal.sections.set("catalysts", sec);
+      } else {
+        universal.sections.set("catalysts", catalysts);
+        const inputs = narrative.inputKeys.length;
+        log(`${inputs} inputs (futures, rates, Fed calendar, commodities, breadth, positioning, headline flow) given to the writer as fact keys; it never sees a figure`);
+        if (rec) log(`${rec.model}: ${rec.status} after ${rec.attempts} attempt${rec.attempts === 1 ? "" : "s"} · ${((rec.latencyMs ?? 0) / 1000).toFixed(1)} s · ${(rec.completionTokens ?? 0).toLocaleString("en-US")} tokens out`);
+        else log(useLlm ? "Writer unavailable; template narrative used" : "Template writer used (no model configured)");
+        log(`${narrative.paragraphs.length} paragraphs, generator: ${narrative.generator}`);
+      }
+      for (const po of outs) {
+        for (const f of universal.fb.all()) if (!po.prep.facts.has(f.key)) po.prep.facts.add(f); // headline facts added by the narrative step
+        const cat = universal.sections.get("catalysts");
+        if (cat) po.spec.splice(Math.min(2, po.spec.length), 0, cat);
+        po.spec.sort((a, b) => sectionPosition(a.kind) - sectionPosition(b.kind));
+      }
+      summary.narrative = rec ? { status: rec.status, tokensOut: rec.completionTokens, promptTokens: rec.promptTokens, generator: narrative.generator } : { generator: narrative.generator };
+      set({ rowsIn: narrative.inputKeys.length, rowsOut: narrative.paragraphs.length + 1, detail: { generator: narrative.generator, status: rec?.status ?? "template" } });
+    });
 
     await step("generate_brief", async (log, set) => {
       let briefsDone = 0;
       let reportedFailure = false;
-      if (useLlm) log(`Calling ${modelName()} for ${outs.length} briefs (5 at a time)`);
-      await pool(outs, 5, async (po) => {
+      if (useLlm) log(`Calling ${modelName()} for ${outs.length} call-list briefs (6 at a time; replayed from cache when unchanged)`);
+      await pool(outs, 6, async (po) => {
         if (!useLlm) { po.briefGen = { headline: "template" }; return; }
-        const r = await writeBrief(po.prep);
+        const r = await writeBrief(po.prep, { complete, kinds: CALL_LIST_KINDS });
         po.brief = r.text; po.briefGen = r.generators; po.briefRecord = r.record;
         briefsDone += 1;
-        log(`Brief ${briefsDone}/${outs.length} ${r.record.status} · ${((r.record.latencyMs ?? 0) / 1000).toFixed(1)}s · ${(r.record.completionTokens ?? 0).toLocaleString()} tokens out`);
+        log(`Brief ${briefsDone}/${outs.length} ${r.record.status} · ${((r.record.latencyMs ?? 0) / 1000).toFixed(1)}s · ${(r.record.completionTokens ?? 0).toLocaleString("en-US")} tokens out`);
         const err = r.record.validation?.error;
         if (err && !reportedFailure) { reportedFailure = true; log(`Model call failed, template used instead: ${String(err).slice(0, 200)}`); }
       });
@@ -232,12 +355,12 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
       const jobs = outs.flatMap((po) => po.prep.cards.map((ctx) => ({ po, ctx })));
       let cardsDone = 0;
       let reportedFailure = false;
-      if (useLlm) log(`Calling ${modelName()} for ${jobs.length} call cards (6 at a time)`);
-      const done = await pool(jobs, 6, async ({ po, ctx }) => {
+      if (useLlm) log(`Calling ${modelName()} for ${jobs.length} call cards (10 at a time; replayed from cache when unchanged)`);
+      const done = await pool(jobs, 10, async ({ po, ctx }) => {
         if (!useLlm) return { po, out: { ctx, text: templateCard(ctx), generator: "template", record: null } as CardOut };
-        const r = await writeCard(ctx, po.prep);
+        const r = await writeCard(ctx, po.prep, { complete });
         cardsDone += 1;
-        log(`Card ${cardsDone}/${jobs.length} · ${ctx.clientName} · ${r.record.status} · ${((r.record.latencyMs ?? 0) / 1000).toFixed(1)}s`);
+        if (cardsDone % 10 === 0 || cardsDone === jobs.length) log(`Cards ${cardsDone}/${jobs.length} written`);
         const err = r.record.validation?.error;
         if (err && !reportedFailure) { reportedFailure = true; log(`Model call failed, template used instead: ${String(err).slice(0, 200)}`); }
         return { po, out: { ctx, text: r.text, generator: r.generator, record: r.record } as CardOut };
@@ -252,6 +375,7 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
       set({ rowsIn: jobs.length, rowsOut: jobs.length });
     });
 
+    // ---------------------------------------------------------------- stage 4: validation, storage, QC (05:30)
     await step("validate", async (log, set) => {
       let checked = 0, replaced = 0;
       for (const po of outs) {
@@ -260,6 +384,11 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
         const tb = templateBrief(po.prep.brief);
         if (bad(po.brief.headline, allowedBrief)) { po.brief.headline = tb.headline; replaced++; }
         po.brief.sections = po.brief.sections.map((s, i) => (bad(s.body, allowedBrief) ? (replaced++, tb.sections.find((x) => x.kind === s.kind) ?? tb.sections[i]) : s));
+        // the market brief: every template, and each Catalysts paragraph, goes through the same validator
+        for (const s of po.spec) {
+          if (s.status !== "ok" || !s.template) continue;
+          if (bad(s.template, allowedBrief)) { replaced++; throw new Error(`Section ${s.kind} failed validation for ${po.prep.profileId}: ${validateText(s.template, { allowedKeys: allowedBrief }).errors.slice(0, 3).join("; ")}`); }
+        }
         for (const c of po.cards) {
           const allowed = new Set(c.ctx.keys);
           const t = templateCard(c.ctx);
@@ -269,7 +398,6 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
             talkingPoints: c.text.talkingPoints.map((x, i) => fix(x, t.talkingPoints[i] ?? t.talkingPoints[0])),
             watchOuts: c.text.watchOuts.map((x, i) => fix(x, t.watchOuts[i] ?? t.watchOuts[0])),
           };
-          // rendering must resolve every token
           po.prep.facts.render([c.text.headline, c.text.why, ...c.text.talkingPoints, ...c.text.watchOuts].join(" "));
         }
       }
@@ -279,12 +407,86 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
       set({ rowsIn: checked, rowsOut: checked - replaced });
     });
 
-    await step("publish", async (log, set) => {
+    const stored = await step("persist", async (log, set) => {
+      const res = new Map<string, { briefId: string }>();
       let cards = 0;
-      for (const po of outs) cards += await publishProfile(db, runId, businessDate, po);
-      log(`${outs.length} briefs and ${cards} call cards published`);
-      summary.published = { briefs: outs.length, cards };
+      for (const po of outs) {
+        const r = await persistDraft(db, runId, businessDate, po, health);
+        res.set(po.prep.profileId, { briefId: r.briefId });
+        cards += r.cards;
+      }
+      log(`${outs.length} briefs stored as drafts, ${cards} call cards, ${outs.reduce((a, p) => a + p.prep.facts.keys().length, 0).toLocaleString("en-US")} facts with lineage`);
       set({ rowsIn: outs.length, rowsOut: cards });
+      return res;
+    });
+
+    const held = new Set<string>();
+    await step("qc_review", async (log, set) => {
+      const reference = universalHash(outs[0]?.spec ?? []);
+      const subjects = outs.map((po): QcSubject => ({
+        profileId: po.prep.profileId, name: people.get(po.prep.profileId)?.full ?? "", facts: po.prep.facts, sections: po.spec, prefs: prefsMap.get(po.prep.profileId)!,
+        forbidden: po.prep.forbidden, health, cardText: po.cards.flatMap((c) => [c.text.headline, c.text.why, ...c.text.talkingPoints, ...c.text.watchOuts]),
+      }));
+      const rows: { brief: string; profile: string; kind: string; status: string; checks: unknown; reviewer: string | null; notes: string | null }[] = [];
+      let autoFail = 0;
+      for (const s of subjects) {
+        const checks = automatedChecks(s, reference);
+        const fail = checks.filter((c) => !c.ok);
+        if (fail.length) { autoFail++; held.add(s.profileId); log(`HOLD ${s.name}: ${fail.map((f) => f.label).join("; ")}`); }
+        rows.push({ brief: stored.get(s.profileId)!.briefId, profile: s.profileId, kind: "automated", status: fail.length ? "flagged" : "passed", checks, reviewer: "Automated QC", notes: fail.length ? `${fail.length} checks failed` : "All checks passed" });
+      }
+      log(`Automated QC: ${subjects.length - autoFail} of ${subjects.length} briefs passed all ${rows[0] ? (rows[0].checks as unknown[]).length : 0} checks (traceability, validator, information barrier, setup, universal sections identical, stale data, units, empty sections)`);
+      const sample = pickSample(subjects);
+      log(`Spot-check: ${sample.length} of ${subjects.length} briefs sampled for the human reviewer`);
+      let flagged = 0;
+      for (const [i, s] of sample.entries()) {
+        if (o.timelapse) await sleep(420);
+        const r = simulatedSpotCheck(s, Boolean(o.qcFlag) && i === 0);
+        if (r.status === "flagged") { flagged++; held.add(s.profileId); }
+        log(`${r.status === "passed" ? "PASS" : "HOLD"} ${s.name}: ${r.notes}`);
+        rows.push({ brief: stored.get(s.profileId)!.briefId, profile: s.profileId, kind: "spot_check", status: r.status, checks: r.checks, reviewer: r.reviewer, notes: r.notes });
+      }
+      await db.asService(async (q) => {
+        await q(`delete from qc_reviews where brief_id = any($1::uuid[])`, [rows.map((r) => r.brief)]);
+        await q(
+          `insert into qc_reviews (run_id, brief_id, profile_id, kind, status, checks, reviewer, notes, reviewed_at)
+           select $1, (x->>'brief')::uuid, (x->>'profile')::uuid, x->>'kind', x->>'status', x->'checks', x->>'reviewer', x->>'notes', now() from jsonb_array_elements($2::jsonb) x`,
+          [runId, JSON.stringify(rows)]);
+        const heldIds = [...held].map((id) => stored.get(id)!.briefId);
+        await q(`update briefs set qc_status = case when id = any($2::uuid[]) then 'flagged' else 'passed' end where run_id = $1`, [runId, heldIds]);
+      });
+      if (held.size) log(`${held.size} brief${held.size > 1 ? "s" : ""} held for review; not published, not emailed`);
+      summary.qc = { automatedFailed: autoFail, sampled: sample.length, flagged, held: held.size };
+      set({ rowsIn: subjects.length, rowsOut: subjects.length - held.size, detail: { sampled: sample.length, held: held.size } });
+    });
+
+    // ---------------------------------------------------------------- stage 5: delivery (06:30)
+    await step("publish", async (log, set) => {
+      let n = 0;
+      for (const po of outs) {
+        if (held.has(po.prep.profileId)) continue;
+        const prefs = prefsMap.get(po.prep.profileId)!;
+        await db.asService((q) => q(`update briefs set status = 'published', published_at = $2::timestamptz where id = $1`, [stored.get(po.prep.profileId)!.briefId, publishedAt(businessDate, po.prep.profileId, prefs.sendTime)]));
+        n++;
+      }
+      log(`${n} dashboards published${held.size ? `; ${held.size} held` : ""}. Each person's brief is visible only to them (row-level security)`);
+      summary.published = { briefs: n, cards: outs.filter((p) => !held.has(p.prep.profileId)).reduce((a, p) => a + p.cards.length, 0) };
+      set({ rowsIn: outs.length, rowsOut: n });
+    });
+
+    await step("deliver", async (log, set) => {
+      const items: DeliveryItem[] = outs.filter((po) => !held.has(po.prep.profileId)).map((po) => {
+        const cat = po.spec.find((s) => s.kind === "catalysts");
+        const generatedAtIso = new Date(`${businessDate}T05:15:00-04:00`).toISOString();
+        return {
+          briefId: stored.get(po.prep.profileId)!.briefId, profileId: po.prep.profileId, name: people.get(po.prep.profileId)?.full ?? "", email: people.get(po.prep.profileId)?.email ?? "",
+          prefs: prefsMap.get(po.prep.profileId)!, facts: po.prep.facts, sections: po.spec, oneLine: (cat?.data.oneLine as string) ?? "", businessDate, generatedAt: generatedAtIso,
+        };
+      });
+      const r = await deliver(db, runId, items, (health.email_relay ?? "ok") === "ok", log);
+      log(`Nothing is ever sent to a client: recipients are the salespeople only`);
+      summary.delivery = r;
+      set({ rowsIn: items.length, rowsOut: r.dashboard + r.email, detail: r });
     });
 
     summary.durationMs = Date.now() - started;
@@ -293,91 +495,10 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
     return { runId, status: "succeeded", summary };
   } catch (e) {
     summary.error = e instanceof Error ? e.message : String(e);
+    console.error(`[pipeline ${runId.slice(0, 8)}] FAILED: ${summary.error}`);
     summary.durationMs = Date.now() - started;
     await db.asService((q) => q(`update pipeline_runs set status='failed', finished_at=now(), summary=$2::jsonb where id=$1`, [runId, JSON.stringify(summary)])).catch(() => {});
     publish(runId, { type: "done", runId, status: "failed", summary });
     return { runId, status: "failed", summary };
   }
-}
-
-/**
- * Demo clock: briefs are stamped with the firm's scheduled publish time on the business date (06:30 New York,
- * a little spread per person), so the product reads as it would on a live morning. The real run time is in pipeline_runs.
- */
-function publishedAt(businessDate: string, profileId: string): string {
-  const jitter = parseInt(profileId.slice(0, 4), 16) % 240; // seconds
-  const base = new Date(`${businessDate}T06:30:00-04:00`).getTime();
-  return new Date(base + jitter * 1000).toISOString();
-}
-
-const tokensOf = (s: string) => [...s.matchAll(/\{\{([^}]+)\}\}/g)].map((m) => m[1]);
-
-async function publishProfile(db: Db, runId: string, businessDate: string, po: ProfileOut): Promise<number> {
-  const { prep } = po;
-  const fb = prep.facts;
-  return db.asService(async (q: Q) => {
-    const existing = await q<{ id: string }>(`select id from briefs where business_date = $1 and profile_id = $2`, [businessDate, prep.profileId]);
-    const prior = existing[0]
-      ? await q<{ client_id: string; status: string; acted_at: string | null }>(`select client_id, status, acted_at from call_cards where brief_id = $1`, [existing[0].id])
-      : [];
-    const keep = new Map(prior.map((p) => [p.client_id, p]));
-
-    const b = (await q<{ id: string }>(
-      `insert into briefs (business_date, profile_id, run_id, status, headline, version, generated_at, published_at)
-       values ($1, $2, $3, 'published', $4, 1, $5::timestamptz, $5::timestamptz)
-       on conflict (business_date, profile_id) do update
-         set run_id = excluded.run_id, status = 'published', headline = excluded.headline, version = briefs.version + 1, generated_at = excluded.generated_at, published_at = excluded.published_at
-       returning id`,
-      [businessDate, prep.profileId, runId, fb.render(po.brief.headline), publishedAt(businessDate, prep.profileId)],
-    ))[0].id;
-
-    await q(`delete from brief_sections where brief_id = $1`, [b]);
-    await q(`delete from brief_facts where brief_id = $1`, [b]);
-    await q(`delete from call_cards where brief_id = $1`, [b]);
-    await q(`delete from generation_records where brief_id = $1`, [b]);
-
-    await q(
-      `insert into brief_facts (brief_id, key, label, value, display, unit, source, as_of)
-       select $1, x->>'key', x->>'label', nullif(x->>'value','')::numeric, x->>'display', x->>'unit', x->>'source', (x->>'asOf')::timestamptz from jsonb_array_elements($2::jsonb) x`,
-      [b, JSON.stringify(fb.all().map((f) => ({ key: f.key, label: f.label, value: f.value == null ? "" : String(f.value), display: f.display, unit: f.unit, source: f.source, asOf: f.asOf })))],
-    );
-
-    const sections = po.brief.sections.map((s, i) => ({
-      kind: s.kind, position: i + 1, title: s.title, tpl: s.body, rendered: fb.render(s.body), keys: [...new Set(tokensOf(s.body))], gen: po.briefGen[s.kind] ?? "template",
-    }));
-    await q(
-      `insert into brief_sections (brief_id, kind, position, title, body_template, body_rendered, fact_keys, generator)
-       select $1, x->>'kind', (x->>'position')::int, x->>'title', x->>'tpl', x->>'rendered', array(select jsonb_array_elements_text(x->'keys')), x->>'gen' from jsonb_array_elements($2::jsonb) x`,
-      [b, JSON.stringify(sections)],
-    );
-
-    const cards = po.cards.map((c) => {
-      const pair = (arr: string[]) => arr.map((t) => ({ template: t, rendered: fb.render(t) }));
-      const old = keep.get(c.ctx.clientId);
-      return {
-        client: c.ctx.clientId, contact: c.ctx.contactId, event: c.ctx.eventId, rank: c.ctx.rank, urgency: c.ctx.urgency,
-        score: prep.cardScore.get(c.ctx.clientId) ?? 0, headline: fb.render(c.text.headline), whyT: c.text.why, whyR: fb.render(c.text.why),
-        tp: pair(c.text.talkingPoints), wo: pair(c.text.watchOuts), keys: c.ctx.keys, factors: prep.cardFactors.get(c.ctx.clientId) ?? {}, gen: c.generator,
-        status: old?.status ?? "new", acted: old?.acted_at ?? null,
-      };
-    });
-    if (cards.length) await q(
-      `insert into call_cards (brief_id, profile_id, client_id, contact_id, event_id, rank, score, urgency, headline, why_template, why_rendered, talking_points, watch_outs, fact_keys, factors, generator, status, acted_at)
-       select $1, $2, (x->>'client')::uuid, nullif(x->>'contact','')::uuid, nullif(x->>'event','')::uuid, (x->>'rank')::int, (x->>'score')::numeric, x->>'urgency', x->>'headline', x->>'whyT', x->>'whyR',
-              x->'tp', x->'wo', array(select jsonb_array_elements_text(x->'keys')), x->'factors', x->>'gen', x->>'status', nullif(x->>'acted','')::timestamptz
-         from jsonb_array_elements($3::jsonb) x`,
-      [b, prep.profileId, JSON.stringify(cards)],
-    );
-
-    const recs = [
-      ...(po.briefRecord ? [po.briefRecord] : []),
-      ...po.cards.flatMap((c) => (c.record ? [c.record] : [])),
-    ];
-    if (recs.length) await q(
-      `insert into generation_records (brief_id, profile_id, target, provider, model, status, attempts, prompt_tokens, completion_tokens, latency_ms, validation)
-       select $1, $2, x->>'target', x->>'provider', x->>'model', x->>'status', (x->>'attempts')::int, (x->>'promptTokens')::int, (x->>'completionTokens')::int, (x->>'latencyMs')::int, x->'validation' from jsonb_array_elements($3::jsonb) x`,
-      [b, prep.profileId, JSON.stringify(recs)],
-    );
-    return cards.length;
-  });
 }
