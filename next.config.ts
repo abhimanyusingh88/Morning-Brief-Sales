@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@electric-sql/pglite", "postgres"],
   // migrations are read from disk at startup (Supabase), so they must ship with the server bundle
   outputFileTracingIncludes: { "/**": ["./supabase/migrations/**/*", "./src/lib/db/local-stubs.sql"] },
+  async redirects() {
+    return [{ source: "/settings", destination: "/setup", permanent: false }];
+  },
   poweredByHeader: false,
   devIndicators: false,
   experimental: { serverActions: { bodySizeLimit: "1mb" } },
