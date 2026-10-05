@@ -117,7 +117,7 @@ export function FeedDrawer({ feedKey, view, ingestDone, onClose }: { feedKey: st
                   {sample ? (
                     <pre tabIndex={0} className="scroll-thin max-h-72 overflow-auto rounded-lg bg-sunken px-3 py-2.5 font-mono text-[12px] leading-[1.55] text-ink-2 focus-visible:outline-2 focus-visible:outline-brand" aria-label="Sample payload, JSON">{sample}</pre>
                   ) : <p className="rounded-lg border border-dashed border-line-strong px-3 py-3 text-[12.5px] text-muted">{bad ? "No records were accepted from this connector." : "No payload yet."}</p>}
-                  <p className="mt-1.5 text-[12px] text-muted">Simulated data; the first records the connector returned.</p>
+                  <p className="mt-1.5 text-[12px] text-muted">Sample records returned by this connector.</p>
                 </section>
               </div>
             </>

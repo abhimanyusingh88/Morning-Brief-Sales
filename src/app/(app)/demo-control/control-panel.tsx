@@ -39,7 +39,7 @@ export function ControlPanel({ scenarios, initial }: { scenarios: { key: string;
           ))}
         </div>
       </fieldset>
-      <label className="flex cursor-pointer items-center gap-2 text-[13.5px]"><input type="checkbox" className="h-4 w-4 accent-brand" checked={live} onChange={(e) => setLive(e.target.checked)} /> Slow it down so the room can follow each step</label>
+      <label className="flex cursor-pointer items-center gap-2 text-[13px]"><input type="checkbox" className="h-4 w-4 accent-brand" checked={live} onChange={(e) => setLive(e.target.checked)} /> Follow each step with paced playback</label>
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
         <Button variant="primary" size="lg" onClick={run} disabled={busy !== null || !sel.length}>{busy === "run" ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />} Run morning pipeline</Button>
         <Button variant="secondary" size="lg" onClick={reset} disabled={busy !== null}>{busy === "reset" ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />} Reset call statuses</Button>

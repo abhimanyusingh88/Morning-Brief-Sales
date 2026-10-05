@@ -34,16 +34,23 @@ export type Action =
   | { type: "event"; ev: PipelineEvent; now: number; defs: readonly StepDef[] }
   | { type: "conn"; conn: Conn };
 
+// Use the workflow definition for display metadata when replaying older runs.
+// Stored step results and logs are preserved without changing the database.
+function displayStep(step: StepState, defs: readonly StepDef[]): StepState {
+  const def = defs.find(([key]) => key === step.key);
+  return def ? { ...step, stage: def[2], simAt: def[3] } : step;
+}
+
 export function reduce(v: RunView, a: Action): RunView {
   if (a.type === "conn") return v.conn === a.conn ? v : { ...v, conn: a.conn };
   const { ev, now } = a;
   switch (ev.type) {
     case "run":
       // every (re)connection replays from the start, so a run event always begins afresh
-      return { ...v, businessDate: ev.businessDate, status: ev.status, steps: ev.steps.length ? ev.steps : skeleton(a.defs), feeds: {}, summary: null, seen: {}, conn: "live" };
+      return { ...v, businessDate: ev.businessDate, status: ev.status, steps: ev.steps.length ? ev.steps.map((step) => displayStep(step, a.defs)) : skeleton(a.defs), feeds: {}, summary: null, seen: {}, conn: "live" };
     case "step": {
       const seen = ev.step.status === "running" && v.seen[ev.step.seq] == null ? { ...v.seen, [ev.step.seq]: now } : v.seen;
-      return { ...v, seen, steps: v.steps.map((s) => (s.seq === ev.step.seq ? ev.step : s)) };
+      return { ...v, seen, steps: v.steps.map((s) => (s.seq === ev.step.seq ? displayStep(ev.step, a.defs) : s)) };
     }
     case "feed":
       return { ...v, feeds: { ...v.feeds, [ev.feed.feedKey]: ev.feed } };

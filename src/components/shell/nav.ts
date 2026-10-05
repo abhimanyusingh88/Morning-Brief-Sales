@@ -31,7 +31,7 @@ export const NAV: { group: string; items: NavItem[] }[] = [
     group: "Oversight",
     items: [
       { href: "/compliance", label: "Compliance", icon: ShieldCheck, roles: ["compliance", "admin"] },
-      { href: "/demo-control", label: "Demo control", icon: SlidersHorizontal, roles: ["admin"] },
+      { href: "/demo-control", label: "Run settings", icon: SlidersHorizontal, roles: ["admin"] },
     ],
   },
   {

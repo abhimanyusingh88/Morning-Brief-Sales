@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { testDb, pid } from "./helpers/testdb";
+import { testDb, pid, installTestDb } from "./helpers/testdb";
 import { signSession } from "../src/lib/auth/session";
 
 const req = (method: string, body?: unknown, cookie?: string) =>
@@ -10,7 +10,7 @@ const valid = { sectors: ["Technology", "Energy"], products: ["Equities", "Optio
 let route: typeof import("../src/app/api/brief-prefs/route");
 
 beforeAll(async () => {
-  (globalThis as unknown as { __mbDb?: Promise<unknown> }).__mbDb = testDb();
+  installTestDb();
   route = await import("../src/app/api/brief-prefs/route");
 }, 60_000);
 

@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { testDb, pid } from "./helpers/testdb";
+import { testDb, pid, installTestDb } from "./helpers/testdb";
 import { signSession } from "../src/lib/auth/session";
 import { runPipeline } from "../src/lib/pipeline/run";
 
@@ -8,7 +8,7 @@ let rahman: string, okafor: string, whitaker: string;
 const cookie = (id: string) => ({ cookie: `mb_session=${signSession(id)}`, "content-type": "application/json" });
 
 beforeAll(async () => {
-  (globalThis as unknown as { __mbDb?: Promise<unknown> }).__mbDb = testDb();
+  installTestDb();
   const db = await testDb();
   rahman = await pid("rahman"); okafor = await pid("okafor"); whitaker = await pid("whitaker");
   await runPipeline({ db, businessDate: D, useLlm: false });

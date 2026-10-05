@@ -1,28 +1,28 @@
-@import "tailwindcss";
+@import "tailwindcss" source("../");
 
 @theme inline {
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-serif: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-serif: var(--font-sans);
 
-  --color-bg: #f5f6f8;
+  --color-bg: #f5f7fa;
   --color-surface: #ffffff;
-  --color-sunken: #eff1f5;
-  --color-line: #e3e7ee;
-  --color-line-strong: #cfd5df;
-  --color-ink: #0e1627;
-  --color-ink-2: #3b4658;
-  --color-muted: #5f6b7e;
-  --color-subtle: #8c96a8;
+  --color-sunken: #edf2f6;
+  --color-line: #dfe6ed;
+  --color-line-strong: #c4cfd9;
+  --color-ink: #213547;
+  --color-ink-2: #425b70;
+  --color-muted: #62788a;
+  --color-subtle: #718497;
 
-  --color-navy: #0a1628;
-  --color-navy-2: #111f36;
-  --color-navy-line: #1d2d49;
+  --color-navy: #213343;
+  --color-navy-2: #2a4053;
+  --color-navy-line: #354a5c;
 
-  --color-brand: #2d7dd2;
-  --color-brand-600: #2369b4;
-  --color-brand-50: #eaf3fc;
-  --color-brand-100: #d5e7f8;
+  --color-brand: #087f8c;
+  --color-brand-600: #066674;
+  --color-brand-50: #eaf6f7;
+  --color-brand-100: #cbe9ec;
   --color-cyan: #00b8e6;
 
   --color-up: #0f8a5f;
@@ -32,13 +32,13 @@
   --color-amber: #d9870b;
   --color-amber-50: #fdf3df;
 
-  /* The brief itself reads like a printed note: warm paper, a serif title, mono figures. */
-  --color-paper: #f6f4ef;
-  --color-paper-2: #efece4;
-  --color-paper-line: #e3ded1;
+  /* Brief surfaces share the workspace palette; figures retain tabular numerals. */
+  --color-paper: #ffffff;
+  --color-paper-2: #f5f7fa;
+  --color-paper-line: #dfe6ed;
   --color-gold: #9a6b12;
-  --color-callout: #f2e5c4;
-  --color-callout-line: #e6d4a0;
+  --color-callout: #eaf6f7;
+  --color-callout-line: #cbe9ec;
 
   --radius-card: 12px;
   --shadow-card: 0 1px 2px rgba(14, 22, 39, 0.04), 0 1px 1px rgba(14, 22, 39, 0.03);
@@ -55,7 +55,16 @@ body {
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "cv11", "ss01";
 }
-* { border-color: var(--color-line); }
+@layer base {
+  * { border-color: var(--color-line); }
+  button, input, select, textarea { font: inherit; }
+  button, a, input, select, textarea, summary { -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: 2px solid var(--color-brand); outline-offset: 3px; }
+  input, select, textarea { color: var(--color-ink); }
+  input::placeholder, textarea::placeholder { color: var(--color-muted); }
+  th { vertical-align: middle; }
+  td { vertical-align: middle; }
+}
 ::selection { background: var(--color-brand-100); }
 
 /* Numbers: always tabular, right-aligned in tables. */
@@ -96,10 +105,36 @@ body {
 .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-subtle); }
 .hairline { border-color: var(--color-line); }
 
-/* ---- brief-ui (setup and brief screens) ----
-   The `* { border-color }` reset above is unlayered, so it beats Tailwind's layered border-colour utilities
-   (border-paper-line, divide-*, border-ink ...). Paper surfaces opt in to their own rule colours here. */
-.paper-surface, .paper-surface * { border-color: var(--color-paper-line); }
-.paper-surface .border-ink-rule { border-color: var(--color-ink); }
-.paper-surface .border-callout { border-color: var(--color-callout-line); }
+/* Shared layout defaults live below utility overrides in the cascade. */
+@layer components {
+  .paper-surface { border-color: var(--color-paper-line); }
+  .workspace-content { min-width: 0; }
+  .workspace-content h1 { text-wrap: balance; }
+  .workspace-content :is(p, dd, li) { overflow-wrap: anywhere; }
+  .workspace-content table { border-collapse: collapse; }
+  .workspace-content thead { background: #f7f9fb; }
+  .workspace-content th { height: 42px; }
+  .workspace-content td { height: 48px; }
+  .workspace-content tbody tr { transition: background-color 120ms ease; }
+  .workspace-content tbody tr:hover { background-color: #f7f9fb; }
+  .workspace-content .grid > * { min-width: 0; }
+  .workspace-content .serif { font-weight: 600; font-style: normal; letter-spacing: -0.025em; }
+}
+
+.skip-link { position: fixed; top: 12px; left: 12px; z-index: 100; transform: translateY(-160%); border-radius: 8px; background: white; padding: 10px 16px; box-shadow: var(--shadow-pop); }
+.skip-link:focus { transform: none; }
+
+@media (min-width: 1024px) and (max-height: 620px) {
+  .desktop-sidebar { display: none; }
+  .mobile-nav-trigger { display: flex; }
+  .mobile-nav-overlay, .mobile-nav-panel { display: flex; }
+}
+
+@media print {
+  .desktop-sidebar, .app-topbar, .skip-link { display: none !important; }
+  .app-shell, .app-column { display: block !important; height: auto !important; overflow: visible !important; }
+  .app-main { overflow: visible !important; }
+  .workspace-content { max-width: none !important; padding: 0 !important; }
+  body { background: white; }
+}
 /* ---- end brief-ui ---- */

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Badge, UrgencyBadge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/states";
+import { PageHeader } from "@/components/ui/page-header";
 import { getMe } from "@/lib/auth/session";
 import { listClients } from "@/lib/data/clients";
 import { SEGMENT_LABEL } from "@/lib/format";
@@ -20,13 +21,10 @@ export default async function Clients({ searchParams }: { searchParams: Promise<
   const segs = Object.keys(SEGMENT_LABEL);
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="text-[24px] font-semibold tracking-[-0.02em]">Clients</h1>
-        <p className="mt-0.5 text-[13.5px] text-muted">{rows.length} clients in your coverage.</p>
-      </header>
+      <PageHeader eyebrow="Coverage" title="Clients" description={`${rows.length} clients in your coverage. Find a relationship and view its latest activity.`} />
       <Card className="overflow-hidden">
         <form className="flex flex-wrap items-center gap-2 border-b border-line p-3" role="search">
-          <input name="q" defaultValue={sp.q} placeholder="Search by name" aria-label="Search clients" className="h-9 w-64 rounded-lg border border-line-strong bg-surface px-3 text-[13.5px] outline-none focus:border-brand focus:ring-2 focus:ring-brand-100" />
+          <input name="q" defaultValue={sp.q} placeholder="Search by name" aria-label="Search clients" className="h-9 w-full rounded-lg border border-line-strong bg-surface px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand-100 sm:w-64" />
           <div className="flex flex-wrap gap-1">
             <Link href="/clients" className={cn("rounded-md px-2.5 py-1.5 text-[12.5px] font-medium", !sp.s ? "bg-navy text-white" : "text-muted hover:bg-sunken")}>All</Link>
             {segs.map((s) => <Link key={s} href={`/clients?s=${s}`} className={cn("rounded-md px-2.5 py-1.5 text-[12.5px] font-medium", sp.s === s ? "bg-navy text-white" : "text-muted hover:bg-sunken")}>{SEGMENT_LABEL[s]}</Link>)}
@@ -34,7 +32,7 @@ export default async function Clients({ searchParams }: { searchParams: Promise<
         </form>
         {rows.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-[13.5px]">
+            <table className="w-full min-w-[720px] text-[13px]">
               <thead className="bg-bg text-left text-[12px] text-muted">
                 <tr><th className="px-5 py-2 font-medium">Client</th><th className="px-3 py-2 font-medium">Type</th><th className="px-3 py-2 font-medium">Tier</th><th className="px-3 py-2 text-right font-medium">AUM</th><th className="px-3 py-2 text-right font-medium">Last contact</th><th className="px-5 py-2 font-medium">Today</th></tr>
               </thead>

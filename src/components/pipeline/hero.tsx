@@ -14,7 +14,7 @@ function Clock({ view, running }: { view: RunView; running: boolean }) {
   const t = clockText(simSeconds(view.steps, view.seen, now));
   return (
     <div className="flex items-baseline gap-3" aria-hidden>
-      <span className="num font-mono text-[56px] font-medium leading-none tracking-[-0.03em] text-ink sm:text-[76px]">{t}</span>
+      <span className="num font-mono text-[40px] font-medium leading-none tracking-[-0.03em] text-ink sm:text-[52px]">{t}</span>
       <span className="font-mono text-[13px] font-medium tracking-wide text-muted">ET</span>
     </div>
   );
@@ -37,12 +37,12 @@ function StageBar({ s }: { s: StageView }) {
   const label = s.status === "done" ? "Done" : s.status === "running" ? "In progress" : s.status === "failed" ? "Failed" : "Queued";
   return (
     <li className="min-w-0">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex min-h-10 items-start justify-between gap-2">
         <p className="flex min-w-0 items-center gap-1.5 text-[13px] font-semibold text-ink">
           <span className={cn("grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border text-[11px] font-semibold", s.status === "done" ? "border-up bg-up text-white" : s.status === "running" ? "border-brand text-brand" : s.status === "failed" ? "border-down bg-down text-white" : "border-line-strong text-subtle")}>
             {s.status === "done" ? <Check size={11} strokeWidth={2.5} /> : s.status === "failed" ? "!" : s.def.n}
           </span>
-          <span className="truncate">{s.def.name}</span>
+          <span className="leading-snug">{s.def.name}</span>
         </p>
         <span className={cn("shrink-0 text-[11px] font-medium", s.status === "running" ? "text-brand-600" : s.status === "failed" ? "text-down" : s.status === "done" ? "text-up" : "text-subtle")}>{label}</span>
       </div>
@@ -62,9 +62,9 @@ function FlowCell({ n, last }: { n: FlowNode; last: boolean }) {
         {n.status === "run" ? <Loader2 size={12} strokeWidth={1.5} className="animate-spin text-brand" aria-label="In progress" /> : n.status === "ok" ? <Check size={12} strokeWidth={2} className="text-up" aria-label="Done" /> : n.status === "bad" ? <CircleAlert size={12} strokeWidth={1.5} className="text-down" aria-label="Failed" /> : null}
       </div>
       <p className={cn("num mt-1 font-mono text-[18px] font-medium leading-6", n.figure ? "text-ink" : "text-line-strong")}>{n.figure ?? "—"}</p>
-      <p className="truncate text-[12px] text-muted" title={n.caption}>{n.caption}</p>
+      <p className="text-[12px] leading-snug text-muted">{n.caption}</p>
       {n.note ? <p className="num truncate text-[12px] text-muted">{n.note}</p> : null}
-      {!last ? <ChevronRight size={14} strokeWidth={1.5} aria-hidden className="absolute -right-[13px] top-1/2 z-10 hidden -translate-y-1/2 text-subtle lg:block" /> : null}
+      {!last ? <ChevronRight size={14} strokeWidth={1.5} aria-hidden className="absolute -right-[13px] top-1/2 z-10 hidden -translate-y-1/2 text-subtle 2xl:block" /> : null}
     </li>
   );
 }
@@ -98,7 +98,7 @@ export function Hero({ view, stages, feedTotal, onRetry }: { view: RunView; stag
 
       <div className="grid gap-x-10 gap-y-5 px-5 pb-5 pt-5 sm:px-6 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-end">
         <div>
-          <p className="eyebrow mb-2">Simulated New York time{dateLabel ? <span className="normal-case tracking-normal"> · {dateLabel}</span> : null}</p>
+          <p className="eyebrow mb-2">Workflow clock · New York{dateLabel ? <span className="normal-case tracking-normal"> · {dateLabel}</span> : null}</p>
           <Clock view={view} running={running} />
           {/* the ticking clock is hidden from assistive technology; this line announces each step instead */}
           <p className="sr-only" aria-live="polite">{`Simulated time ${cur?.simAt ?? "04:00"} ET. ${where}. ${cur?.label ?? ""} ${cur ? cur.status : ""}`}</p>
@@ -115,13 +115,13 @@ export function Hero({ view, stages, feedTotal, onRetry }: { view: RunView; stag
         </div>
       </div>
 
-      <ol className="grid gap-x-5 gap-y-4 border-t border-line px-5 py-4 sm:grid-cols-5 sm:px-6" aria-label="Pipeline stages">
+      <ol className="grid gap-x-5 gap-y-4 border-t border-line bg-bg/50 px-5 py-5 sm:grid-cols-2 xl:grid-cols-5 sm:px-6" aria-label="Pipeline stages">
         {sv.map((s) => <StageBar key={s.def.n} s={s} />)}
       </ol>
 
       <div className="border-t border-line px-5 py-4 sm:px-6">
         <p className="eyebrow mb-2.5">Data flow</p>
-        <ol className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7" aria-label="Data flow">
+        <ol className="grid grid-cols-2 gap-3 sm:grid-cols-4 2xl:grid-cols-7" aria-label="Data flow">
           {flow.map((n, i) => <FlowCell key={n.key} n={n} last={i === flow.length - 1} />)}
         </ol>
       </div>

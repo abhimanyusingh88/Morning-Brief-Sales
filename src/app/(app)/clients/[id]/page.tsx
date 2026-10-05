@@ -29,7 +29,7 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
       <Link href="/clients" className="text-[13px] text-muted hover:text-ink">← Clients</Link>
       <Card>
         <CardBody className="flex flex-wrap items-start justify-between gap-5">
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-[26px] font-semibold tracking-[-0.02em]">{c.name}</h1>
               <Badge tone={c.tier === 1 ? "navy" : "outline"}>Tier {c.tier}</Badge>
@@ -40,7 +40,7 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
             <p className="mt-2 max-w-2xl text-[14px] text-ink-2">{c.mandate}. Risk appetite: {c.risk}.</p>
             {d.interests.length ? <div className="mt-3 flex flex-wrap gap-1.5">{d.interests.map((t) => <Badge key={t} tone="brand">{t.replace(/_/g, " ")}</Badge>)}</div> : null}
           </div>
-          <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-[13px]">
+          <dl className="grid w-full grid-cols-2 gap-x-8 gap-y-2 rounded-lg bg-bg p-4 text-[13px] sm:w-auto sm:min-w-[220px]">
             <dt className="text-muted">AUM</dt><dd className="num text-right font-semibold">{formatUsd(c.aumUsdMn * 1e6)}</dd>
             <dt className="text-muted">Tracked book</dt><dd className="num text-right font-semibold">{formatUsd(total)}</dd>
             <dt className="text-muted">Positions</dt><dd className="num text-right font-semibold">{d.positions.length}</dd>
@@ -56,13 +56,11 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
         ) : null}
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="space-y-6">
           <Card className="overflow-hidden">
             <CardHeader title="Positions" sub="Notional and today's move. Moves in percent; yields and spreads in basis points." />
             {d.positions.length ? (
               <div className="max-h-[420px] overflow-auto scroll-thin">
-                <table className="w-full text-[13px]">
+                <table className="w-full min-w-[560px] text-[13px]">
                   <thead className="sticky top-0 bg-bg text-left text-[12px] text-muted"><tr><th className="px-5 py-2 font-medium">Instrument</th><th className="px-3 py-2 font-medium">Sector</th><th className="px-3 py-2 text-right font-medium">Notional</th><th className="px-3 py-2 text-right font-medium">Share</th><th className="px-5 py-2 text-right font-medium">Today</th></tr></thead>
                   <tbody className="divide-y divide-line">
                     {d.positions.map((p) => (
@@ -82,10 +80,12 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
             ) : <EmptyState title="No tracked positions" />}
           </Card>
 
-          <Card className="overflow-hidden">
+      <div className="grid gap-6 xl:grid-cols-2">
+          <Card className="flex max-h-[520px] flex-col overflow-hidden">
             <CardHeader title="Recent tickets" />
             {d.trades.length ? (
-              <table className="w-full text-[13px]">
+              <div className="scroll-thin min-h-0 flex-1 overflow-auto"><table className="w-full min-w-[440px] text-[13px]">
+                <thead className="sticky top-0 bg-bg text-left text-[12px] text-muted"><tr><th className="px-5 py-2 font-medium">Side</th><th className="px-3 py-2 font-medium">Instrument</th><th className="px-3 py-2 text-right font-medium">Notional</th><th className="px-5 py-2 text-right font-medium">When</th></tr></thead>
                 <tbody className="divide-y divide-line">
                   {d.trades.map((t, i) => (
                     <tr key={i}>
@@ -96,13 +96,14 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             ) : <EmptyState title="No tickets in the last weeks" />}
           </Card>
-        </div>
+          <ClientActivity interactions={d.interactions} />
+      </div>
 
-        <div className="space-y-6">
-          <Card>
+      <div className="grid items-stretch gap-6 md:grid-cols-2 xl:grid-cols-3">
+          <Card className="overflow-hidden">
             <CardHeader title="Contacts" />
             <ul className="divide-y divide-line">
               {d.contacts.map((p) => (
@@ -115,7 +116,7 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
             </ul>
           </Card>
 
-          <Card>
+          <Card className="overflow-hidden">
             <CardHeader title="Follow-ups" />
             {d.followups.length ? (
               <ul className="divide-y divide-line">
@@ -129,33 +130,36 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
             ) : <EmptyState title="Nothing open" />}
           </Card>
 
-          <Card>
-            <CardHeader title="Activity" />
-            {d.interactions.length ? (
-              <ol className="relative space-y-4 px-5 py-4 before:absolute before:bottom-6 before:left-[29px] before:top-6 before:w-px before:bg-line">
-                {d.interactions.map((x, i) => {
-                  const I = ICON[x.kind as keyof typeof ICON] ?? CircleDot;
-                  return (
-                    <li key={i} className="relative flex gap-3">
-                      <span className="z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface ring-4 ring-surface"><I size={13} className="text-brand" /></span>
-                      <div className="min-w-0">
-                        <p className="text-[13px] font-semibold">{x.subject}</p>
-                        <p className="mt-0.5 text-[12.5px] leading-snug text-ink-2">{x.note}</p>
-                        <p className="mt-1 text-[11.5px] text-muted">{x.kind} · {timeAgo(x.at)}{x.author ? ` · ${x.author}` : ""}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            ) : <EmptyState title="No activity yet" />}
-          </Card>
-
-          <Card>
+          <Card className="overflow-hidden">
             <CardHeader title="Coverage" />
             <ul className="px-5 py-3 text-[13px]">{d.coverage.map((v) => <li key={v.name} className="flex justify-between py-1"><span>{v.name}</span><span className="text-muted">{v.role}</span></li>)}</ul>
           </Card>
-        </div>
       </div>
     </div>
+  );
+}
+
+function ClientActivity({ interactions }: { interactions: NonNullable<Awaited<ReturnType<typeof getClient360>>>["interactions"] }) {
+  return (
+    <Card className="flex max-h-[520px] flex-col overflow-hidden">
+      <CardHeader title="Activity" sub="Relationship history, newest first" />
+      {interactions.length ? (
+        <ol aria-label="Client activity" className="scroll-thin min-h-0 flex-1 overflow-y-auto px-5 py-2">
+          {interactions.map((x, i) => {
+            const I = ICON[x.kind as keyof typeof ICON] ?? CircleDot;
+            return (
+              <li key={i} className="relative flex gap-3 py-4 before:absolute before:bottom-0 before:left-4 before:top-12 before:w-px before:bg-line after:absolute after:left-4 after:top-0 after:h-4 after:w-px after:bg-line first:after:hidden last:before:hidden">
+                <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 ring-4 ring-surface"><I size={15} className="text-brand" /></span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold">{x.subject}</p>
+                  <p className="mt-1 text-[12.5px] leading-relaxed text-ink-2">{x.note}</p>
+                  <p className="mt-2 text-[11.5px] text-muted">{x.kind} · {timeAgo(x.at)}{x.author ? ` · ${x.author}` : ""}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      ) : <EmptyState title="No activity yet" />}
+    </Card>
   );
 }

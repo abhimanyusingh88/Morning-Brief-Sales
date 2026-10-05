@@ -7,11 +7,11 @@ import { MobileNav } from "./mobile-nav";
 
 export function Topbar({ me, hue, asOf, sources, firm }: { me: Me; hue: number; asOf: string; sources: string; firm: string }) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface/90 px-5 backdrop-blur">
+    <header className="app-topbar z-30 flex h-16 shrink-0 items-center gap-3 border-b border-line bg-surface px-4 sm:px-6 lg:px-8">
       <MobileNav role={me.role} firm={firm} />
-      <SearchTrigger><Search size={15} /> <span className="text-subtle">Search clients, calls, pages</span> <kbd className="ml-auto rounded border border-line bg-sunken px-1.5 py-0.5 font-mono text-[10.5px] text-muted">⌘K</kbd></SearchTrigger>
+      <SearchTrigger><Search size={16} className="shrink-0" /> <span className="min-w-0 truncate text-muted">Search your workspace</span> <kbd className="ml-auto hidden shrink-0 rounded border border-line bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted sm:block">Ctrl K</kbd></SearchTrigger>
       <div className="ml-auto flex items-center gap-3">
-        <div className="hidden items-center gap-2 text-[12px] text-muted md:flex" title={sources}>
+        <div className="hidden shrink-0 items-center gap-2 text-[12px] text-muted xl:flex" title={sources}>
           <span className="live-dot h-1.5 w-1.5 rounded-full bg-up" />
           <span>Data as of <span className="num font-medium text-ink-2">{asOf}</span></span>
         </div>

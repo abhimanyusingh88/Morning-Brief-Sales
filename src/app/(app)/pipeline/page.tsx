@@ -45,7 +45,7 @@ export default async function Pipeline({ searchParams }: { searchParams: Promise
       <PageHeader
         eyebrow="Operations"
         title="Morning run"
-        description="The whole morning, end to end and in time-lapse: every feed connecting, tagging and matching, the narrative, QC and delivery. A salesperson never sees this; the demo does."
+        description="Monitor your morning workflow, from data ingestion and matching to quality review and delivery."
       />
       <MorningRun
         stages={STAGES.map((s) => ({ ...s }))}

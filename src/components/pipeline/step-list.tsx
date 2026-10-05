@@ -55,7 +55,7 @@ export function StepList({ view, stages }: { view: RunView; stages: readonly Sta
 
   return (
     <Card className="min-w-0 overflow-hidden">
-      <CardHeader title="Steps" sub="Each step, the simulated time it starts at, the rows it read and wrote, and what it logged." right={<span className="num pt-0.5 text-[12px] text-muted">{finished} of {view.steps.length} done</span>} />
+      <CardHeader title="Workflow steps" sub="Start times, processed rows and logs for each stage." right={<span className="num pt-0.5 text-[12px] text-muted">{finished} of {view.steps.length} done</span>} />
       <div className={cn("hidden items-center gap-x-3 border-b border-line bg-bg/70 px-5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-subtle sm:grid", COLS)}>
         <span /><span>Step</span><span className="text-right">Clock</span><span className="text-right">Rows in</span><span className="text-right">Rows out</span><span className="text-right">Time</span>
       </div>

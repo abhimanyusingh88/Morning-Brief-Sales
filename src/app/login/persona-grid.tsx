@@ -42,7 +42,7 @@ export function PersonaGrid({ personas }: { personas: Persona[] }) {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {list.map((p) => (
               <button key={p.id} onClick={() => enter(p)} disabled={busy !== null}
-                className="group flex cursor-pointer items-center gap-3.5 rounded-xl border border-navy-line bg-navy-2 p-3.5 text-left transition hover:border-brand hover:bg-[#14264a] disabled:opacity-60">
+                className="group flex min-h-[104px] cursor-pointer items-center gap-3.5 rounded-xl border border-white/15 bg-white/[0.04] p-4 text-left transition hover:border-white/40 hover:bg-white/[0.08] focus-visible:outline-white disabled:opacity-60">
                 <Avatar initials={p.initials} hue={p.hue} size={44} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14.5px] font-semibold">{p.name}</span>

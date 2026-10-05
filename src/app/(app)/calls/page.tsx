@@ -6,6 +6,7 @@ import { Badge, UrgencyBadge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { RichText } from "@/components/ui/fact";
 import { EmptyState } from "@/components/ui/states";
+import { PageHeader } from "@/components/ui/page-header";
 import { getMe } from "@/lib/auth/session";
 import { getBundle, type CardRow } from "@/lib/data/brief";
 import { SEGMENT_LABEL } from "@/lib/format";
@@ -44,14 +45,9 @@ export default async function Calls({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <div className="space-y-5">
-      <header className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-[24px] font-semibold tracking-[-0.02em]">Call list</h1>
-          <p className="mt-0.5 text-[13.5px] text-muted">Ranked for you by exposure, size of the move, timing and relationship. Open a call to see why.</p>
-        </div>
-      </header>
+      <PageHeader eyebrow="My day" title="Call list" description="Your client priorities, ranked by exposure, timing and relationship. Select a call to see the context." />
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
         <Card className="overflow-hidden">
           <div className="flex gap-1 overflow-x-auto border-b border-line p-2" role="tablist" aria-label="Filter calls">
             {FILTERS.map((x) => (
@@ -145,8 +141,8 @@ function Detail({ c, facts }: { c: CardRow; facts: Record<string, import("@/comp
 
         <section>
           <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-subtle">Sources</h4>
-          <div className="mt-2 overflow-hidden rounded-lg border border-line">
-            <table className="w-full text-[12.5px]">
+          <div className="scroll-thin mt-2 overflow-x-auto rounded-lg border border-line">
+            <table className="w-full min-w-[420px] text-[12.5px]">
               <thead className="bg-bg text-left text-muted"><tr><th className="px-3 py-1.5 font-medium">Figure</th><th className="px-3 py-1.5 text-right font-medium">Value</th><th className="px-3 py-1.5 font-medium">Source</th></tr></thead>
               <tbody className="divide-y divide-line">
                 {used.map((f) => <tr key={f.key}><td className="px-3 py-1.5 text-ink-2">{f.label}</td><td className="num px-3 py-1.5 text-right font-semibold">{f.display}</td><td className="px-3 py-1.5 text-muted">{f.source}</td></tr>)}

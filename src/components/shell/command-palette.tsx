@@ -20,7 +20,7 @@ export function SearchTrigger({ children }: { children: React.ReactNode }) {
   }, []);
   return (
     <Ctx.Provider value={{ open: () => setOpen(true) }}>
-      <button onClick={() => setOpen(true)} className="flex h-9 w-full max-w-[420px] cursor-pointer items-center gap-2 rounded-lg border border-line bg-bg px-3 text-[13px] text-muted hover:border-line-strong" aria-label="Search">
+      <button onClick={() => setOpen(true)} className="flex h-9 min-w-0 flex-1 max-w-[420px] cursor-pointer items-center gap-2 rounded-lg border border-line bg-bg px-3 text-[13px] text-muted hover:border-line-strong" aria-label="Search">
         {children}
       </button>
       <Palette open={open} setOpen={setOpen} />

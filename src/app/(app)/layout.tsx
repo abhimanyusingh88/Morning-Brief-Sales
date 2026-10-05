@@ -16,11 +16,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const asOf = meta?.a ? fmtTimeET(new Date(meta.a as string).toISOString()) : "—";
   return (
     <AskProvider>
-      <div className="flex min-h-dvh items-start">
+      <a href="#main-content" className="skip-link">Skip to content</a>
+      <div className="app-shell flex h-dvh overflow-hidden">
         <Sidebar role={me.role} firm={String(meta?.firm ?? "Northgate Capital Markets")} />
-        <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
+        <div className="app-column flex min-h-0 min-w-0 flex-1 flex-col">
           <Topbar me={me} hue={me.hue} asOf={asOf} sources={`Market data: ${String(meta?.s ?? "simulated")}`} firm={String(meta?.firm ?? "Northgate Capital Markets")} />
-          <main className="mx-auto w-full max-w-[1280px] flex-1 px-5 py-6 sm:px-8">{children}</main>
+          <main id="main-content" tabIndex={-1} className="app-main scroll-thin min-h-0 flex-1 overflow-y-auto overscroll-contain focus:outline-none">
+            <div className="workspace-content mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
+          </main>
         </div>
       </div>
     </AskProvider>

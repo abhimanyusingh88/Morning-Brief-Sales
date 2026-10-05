@@ -73,7 +73,7 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
   const grouped = GROUPS.map((g) => ({ g, items: threads.filter((t) => groupOf(t.updatedAt) === g) })).filter((x) => x.items.length);
 
   return (
-    <div className="grid h-[calc(100dvh-112px)] min-h-[520px] gap-4 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_260px]">
+    <div className="grid h-[calc(100dvh-128px)] min-h-[440px] gap-5 lg:grid-cols-[220px_minmax(0,1fr)] 2xl:grid-cols-[220px_minmax(0,1fr)_240px]">
       <aside aria-label="Conversations" className="flex min-h-0 flex-col rounded-[12px] border border-line bg-surface max-lg:hidden">
         <div className="border-b border-line p-3"><Button variant="secondary" className="w-full" onClick={fresh}><MessageSquarePlus size={15} strokeWidth={1.5} /> New chat</Button></div>
         <div className="flex-1 overflow-y-auto p-2">
@@ -96,6 +96,14 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
       </aside>
 
       <section aria-label="Conversation" className="flex min-h-0 flex-col rounded-[12px] border border-line bg-surface">
+        <div className="flex items-center gap-2 border-b border-line p-3 lg:hidden">
+          <label htmlFor="conversation-picker" className="sr-only">Open conversation</label>
+          <select id="conversation-picker" value={activeId ?? ""} disabled={busy || loadingThread} onChange={e => e.target.value ? void open(e.target.value) : fresh()} className="h-9 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-2 text-[13px]">
+            <option value="">New conversation</option>
+            {threads.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
+          </select>
+          <Button size="icon" variant="secondary" onClick={fresh} disabled={busy} aria-label="New conversation"><MessageSquarePlus size={16} /></Button>
+        </div>
         <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
           {loadingThread ? <p className="text-[13px] text-muted" aria-busy>Opening conversation…</p> : messages.length === 0 ? (
             <div className="mx-auto max-w-lg pt-10 text-center">
@@ -125,7 +133,7 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
         </form>
       </section>
 
-      <aside aria-label="Connected sources" className="self-start rounded-[12px] border border-line bg-surface p-4 max-xl:hidden">
+      <aside aria-label="Connected sources" className="self-start rounded-[12px] border border-line bg-surface p-4 max-2xl:hidden">
         <p className="eyebrow flex items-center gap-1.5"><Database size={13} strokeWidth={1.5} /> Connected sources</p>
         <ul className="mt-2.5 space-y-1.5 text-[12.5px] text-ink-2">{SOURCES.map((s) => <li key={s} className="flex gap-2"><span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-up" />{s}</li>)}</ul>
         <p className="mt-3 flex gap-1.5 border-t border-line pt-3 text-[12px] text-muted"><ShieldCheck size={14} strokeWidth={1.5} className="mt-0.5 shrink-0" />Read-only and limited to your own book. The agent never sends anything to a client.</p>

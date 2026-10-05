@@ -2,6 +2,7 @@ import { ArrowLeft, Info } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { etStamp } from "@/components/brief/lib";
+import { emailPreviewHtml } from "@/components/brief/email-html";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -33,7 +34,7 @@ export default async function EmailDigestPage() {
 
       <div role="note" className="flex items-start gap-2.5 rounded-[12px] border border-line bg-surface px-4 py-3 text-[13px] text-ink-2">
         <Info size={15} strokeWidth={1.5} className="mt-0.5 shrink-0 text-muted" />
-        <p><b className="font-semibold text-ink">Preview only.</b> Nothing is sent to a client; the relay is simulated.</p>
+        <p><b className="font-semibold text-ink">Preview only.</b> This view displays your prepared digest. No email is sent to a client.</p>
       </div>
 
       {!d || !d.html ? (
@@ -45,12 +46,12 @@ export default async function EmailDigestPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <Card className="order-2 overflow-hidden lg:order-1">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+          <Card className="order-2 overflow-hidden xl:order-1">
             <CardHeader title="Message" sub="Rendered in an isolated frame: no scripts, links or forms run." />
-            <iframe title="Email digest preview" srcDoc={d.html} sandbox="" className="block h-[960px] w-full border-0 bg-white" />
+            <iframe title="Email digest preview" srcDoc={emailPreviewHtml(d.html)} sandbox="" className="block h-[960px] w-full border-0 bg-white" />
           </Card>
-          <Card className="order-1 self-start lg:order-2">
+          <Card className="order-1 self-start xl:order-2">
             <CardHeader title="Delivery" />
             <CardBody>
               <dl className="space-y-3 text-[13px]">

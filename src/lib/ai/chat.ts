@@ -4,6 +4,7 @@ import { mask, keySym } from "./context";
 import { complete as realComplete, llmConfigured, modelName, type CompleteOptions, type Completion } from "./gateway";
 import type { Fact } from "./facts";
 import { validateText } from "./validator";
+import { agentBriefs, agentCalls } from "../agent/briefs";
 
 /**
  * "Ask Morning Brief". Tools run as the signed-in person (row-level security), so another desk's clients
@@ -51,8 +52,7 @@ const daysText = (n: number) => (n <= 0 ? "today" : n === 1 ? "yesterday" : `${n
 /** ---------------------------------------------------------------- data tools */
 
 async function latestBrief(c: Ctx) {
-  const r = await c.q<{ id: string; business_date: string; headline: string }>(`select id, business_date::text, headline from briefs where profile_id = $1 order by business_date desc limit 1`, [c.meId]);
-  return r[0] ?? null;
+  return agentBriefs(c.q, c.meId);
 }
 
 async function loadBriefFacts(c: Ctx, briefId: string, keys: string[]) {
@@ -64,11 +64,10 @@ async function loadBriefFacts(c: Ctx, briefId: string, keys: string[]) {
 async function topCalls(c: Ctx, n = 5) {
   c.steps.push("Reading today's ranked call list");
   const b = await latestBrief(c);
-  if (!b) return { lines: ["There is no brief for you yet. Ask an admin to run the morning pipeline."], cards: [] as { id: string; client: string; clientId: string }[] };
-  const rows = await c.q(
-    `select cc.id, cc.client_id, cc.rank, cc.urgency, cl.name, cc.why_template, cc.headline from call_cards cc join clients cl on cl.id = cc.client_id
-      where cc.brief_id = $1 and cc.status in ('new','snoozed') order by cc.rank limit $2`, [b.id, n]);
-  await loadBriefFacts(c, b.id, rows.flatMap((r) => tokensIn(String(r.why_template))));
+  if (!b.ids.length) return { lines: [b.desk ? "No published brief is available for your desk yet. Check whether the morning run is awaiting quality review." : "No published brief is available for your account yet. Check whether the morning run is awaiting quality review."], cards: [] as { id: string; client: string; clientId: string }[] };
+  const rows = await agentCalls(c.q, b.ids, b.desk, n);
+  for (const row of rows) await loadBriefFacts(c, row.brief_id, tokensIn(row.why_template));
+  if (!rows.length) return { lines: ["There are no outstanding calls on the published call list."], cards: [] as { id: string; client: string; clientId: string }[] };
   const lines = rows.map((r) => {
     const sentence = String(r.why_template).split(/(?<=\.)\s/)[0];
     const body = sentence.startsWith(String(r.name)) ? sentence : `${r.name}: ${sentence}`;
@@ -166,11 +165,11 @@ async function followups(c: Ctx) {
 async function draftFor(c: Ctx, cl: { id: string; name: string }) {
   c.steps.push(`Drafting a note for ${cl.name} from today's call card`);
   const b = await latestBrief(c);
-  const card = b ? (await c.q(`select talking_points, why_template, headline from call_cards where brief_id = $1 and client_id = $2`, [b.id, cl.id]))[0] : null;
+  const card = (await agentCalls(c.q, b.ids, b.desk, 1, cl.id))[0];
   const contact = (await c.q(`select full_name from contacts where client_id = $1 order by is_primary desc limit 1`, [cl.id]))[0];
-  if (!card || !b) return null;
+  if (!card) return null;
   const pts = (card.talking_points as { template: string }[]).slice(0, 3).map((t) => t.template);
-  await loadBriefFacts(c, b.id, [...pts.flatMap(tokensIn), ...tokensIn(String(card.why_template))]);
+  await loadBriefFacts(c, card.brief_id, [...pts.flatMap(tokensIn), ...tokensIn(String(card.why_template))]);
   const first = contact ? String(contact.full_name).split(" ")[0] : "there";
   const body = `Hi ${first},\n\nQuick note ahead of the open. ${String(card.why_template).split(/(?<=\.)\s/)[0]}\n\nA few things worth discussing:\n${pts.map((p) => `• ${p}`).join("\n")}\n\nHappy to run through levels whenever suits.\n\n${c.firstName}`;
   return { subject: `Morning color: ${cl.name}`, template: body, to: contact ? String(contact.full_name) : null };
@@ -248,7 +247,7 @@ export async function answer(opts: { db: Db; meId: string; firstName: string; me
     let draft: ChatAnswer["draft"];
     let lead = "";
     switch (intent.kind) {
-      case "calls": { const r = await topCalls(c); lines = r.lines; lead = "Here is where I would start today:"; if (r.cards[0]) subject = { id: r.cards[0].clientId, name: r.cards[0].client, explicit: false }; break; }
+      case "calls": { const r = await topCalls(c); lines = r.lines; lead = r.cards.length ? "Here is where I would start today:" : ""; if (r.cards[0]) subject = { id: r.cards[0].clientId, name: r.cards[0].client, explicit: false }; break; }
       case "market": { const r = await marketMoves(c); lines = r.lines; lead = r.lines.length ? "These are the biggest moves relative to a normal day:" : "Nothing is moving outside its normal range."; break; }
       case "followups": { const r = await followups(c); lines = r.lines; lead = "Your open follow-ups, oldest first:"; break; }
       case "exposure": { const r = await exposure(c, intent.term); lines = r.lines; break; }

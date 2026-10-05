@@ -11,7 +11,7 @@ export function SnapshotGrid({ tiles, facts, surface = "paper" }: { tiles: Tile[
   // Eleven tiles leave one cell free in a 2, 3, 4 or 6 column grid; fill it so the ruled grid stays rectangular.
   const filler = tiles.length === 11;
   return (
-    <ul className={cn("grid grid-cols-2 gap-px overflow-hidden rounded-[8px] border sm:grid-cols-3 lg:grid-cols-6", paper ? "border-paper-line bg-paper-line" : "border-line bg-line")}>
+    <ul className={cn("grid grid-cols-2 gap-px overflow-hidden rounded-[8px] border sm:grid-cols-3 xl:grid-cols-6", paper ? "border-paper-line bg-paper-line" : "border-line bg-line")}>
       {tiles.map((t) => (
         <li key={t.symbol} className={cn("min-w-0 px-3.5 py-3", paper ? "bg-paper" : "bg-surface")}>
           <p className="mono truncate text-[10.5px] text-muted">{nameOf(t, facts)}</p>

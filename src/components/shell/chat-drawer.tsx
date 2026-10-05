@@ -163,7 +163,7 @@ function Drawer({ open, setOpen, initial, onConsumed }: { open: boolean; setOpen
             <div ref={end} />
           </div>
           <form className="flex items-center gap-2 border-t border-line p-3" onSubmit={(e) => { e.preventDefault(); void send(input); }}>
-            <input value={input} onChange={(e) => setInput(e.target.value)} maxLength={500} placeholder="Ask about your calls, clients or the tape…" className="h-10 flex-1 rounded-lg border border-line-strong bg-surface px-3 text-[14px] outline-none placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand-100" aria-label="Your question" />
+            <input value={input} onChange={(e) => setInput(e.target.value)} maxLength={500} placeholder="Ask about your calls, clients or the tape…" className="h-10 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 text-[14px] outline-none placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand-100" aria-label="Your question" />
             <Button type="submit" variant="primary" size="icon" disabled={busy || !input.trim()} aria-label="Send" className="h-10 w-10"><SendHorizontal size={16} /></Button>
           </form>
         </Dialog.Content>
