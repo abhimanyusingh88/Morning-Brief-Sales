@@ -1,4 +1,4 @@
-import { Activity, BarChart3, BookOpenText, DatabaseZap, Inbox, LayoutDashboard, MessageSquareText, PhoneCall, ShieldCheck, SlidersHorizontal, SquareCheckBig, Users, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, BookOpenText, DatabaseZap, Inbox, LayoutDashboard, MessageSquareText, Newspaper, PhoneCall, ShieldCheck, SlidersHorizontal, SquareCheckBig, Users, type LucideIcon } from "lucide-react";
 import type { Role } from "@/lib/auth/session";
 
 export interface NavItem { href: string; label: string; icon: LucideIcon; roles: Role[] }
@@ -8,6 +8,7 @@ export const NAV: { group: string; items: NavItem[] }[] = [
     group: "My day",
     items: [
       { href: "/today", label: "Today", icon: LayoutDashboard, roles: ["sales"] },
+      { href: "/today-brief", label: "Today's brief", icon: Newspaper, roles: ["sales"] },
       { href: "/brief", label: "Morning brief", icon: BookOpenText, roles: ["sales"] },
       { href: "/calls", label: "Call list", icon: PhoneCall, roles: ["sales"] },
       { href: "/clients", label: "Clients", icon: Users, roles: ["sales", "desk_head"] },
