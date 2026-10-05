@@ -68,11 +68,6 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
   ))[0].id;
 
   const steps: StepState[] = STEPS.map(([key, label], i) => ({ seq: i + 1, key, label, status: "pending", startedAt: null, finishedAt: null, rowsIn: null, rowsOut: null, detail: {}, log: [] }));
-  await db.asService((q) => q(
-    `insert into pipeline_steps (run_id, seq, key, label) select $1, (x->>'seq')::int, x->>'key', x->>'label' from jsonb_array_elements($2::jsonb) x`,
-    [runId, JSON.stringify(steps.map((s) => ({ seq: s.seq, key: s.key, label: s.label })))],
-  ));
-  publish(runId, { type: "run", runId, businessDate, status: "running", steps: structuredClone(steps) });
 
   // Writes are chained so an older snapshot of a step can never overwrite a newer one.
   let writes: Promise<unknown> = Promise.resolve();
@@ -116,6 +111,12 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
 
   const summary: Record<string, unknown> = { businessDate, llm: useLlm };
   try {
+    await db.asService((q) => q(
+      `insert into pipeline_steps (run_id, seq, key, label) select $1, (x->>'seq')::int, x->>'key', x->>'label' from jsonb_array_elements($2::jsonb) x`,
+      [runId, JSON.stringify(steps.map((s) => ({ seq: s.seq, key: s.key, label: s.label })))],
+    ));
+    publish(runId, { type: "run", runId, businessDate, status: "running", steps: structuredClone(steps) });
+
     const scenarios = o.scenarios?.length ? o.scenarios : defaultScenarios(businessDate);
     summary.scenarios = scenarios;
 
