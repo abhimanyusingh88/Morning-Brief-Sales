@@ -19,10 +19,15 @@ export interface ChatAnswer {
   draft?: { subject: string; template: string; to: string | null };
   generator: "llm" | "rules";
   intent?: string;
+  /** The client this answer is about (for the top-of-list answer, the first name on it). Lets a follow-up such as "draft a note to them" resolve. */
+  subject?: { id: string; name: string; explicit: boolean };
   record?: { model: string; status: string; attempts: number; promptTokens: number | null; completionTokens: number | null; latencyMs: number };
 }
 
 type Completer = (o: CompleteOptions) => Promise<Completion>;
+
+/** A previous turn of the same conversation: text only (figures stay {{tokens}}), plus what the answer was about. */
+export interface HistoryTurn { role: "user" | "assistant"; text: string; meta?: { clientId?: string; clientName?: string; intent?: string } }
 
 interface Ctx {
   q: Q;
@@ -32,6 +37,8 @@ interface Ctx {
   restricted: Set<string>;
   steps: string[];
   now: string;
+  /** Client carried over from earlier in the conversation (or the thread's scope); only used when the message names none. */
+  ctxClient?: { id: string; name: string };
 }
 const add = (c: Ctx, f: Fact) => { c.facts.set(f.key, f); return `{{${f.key}}}`; };
 const view = (f: Fact): FactView => ({ key: f.key, label: f.label, display: f.display, source: f.source, asOf: f.asOf, unit: f.unit });
@@ -57,9 +64,9 @@ async function loadBriefFacts(c: Ctx, briefId: string, keys: string[]) {
 async function topCalls(c: Ctx, n = 5) {
   c.steps.push("Reading today's ranked call list");
   const b = await latestBrief(c);
-  if (!b) return { lines: ["There is no brief for you yet. Ask an admin to run the morning pipeline."], cards: [] as { id: string; client: string }[] };
+  if (!b) return { lines: ["There is no brief for you yet. Ask an admin to run the morning pipeline."], cards: [] as { id: string; client: string; clientId: string }[] };
   const rows = await c.q(
-    `select cc.id, cc.rank, cc.urgency, cl.name, cc.why_template, cc.headline from call_cards cc join clients cl on cl.id = cc.client_id
+    `select cc.id, cc.client_id, cc.rank, cc.urgency, cl.name, cc.why_template, cc.headline from call_cards cc join clients cl on cl.id = cc.client_id
       where cc.brief_id = $1 and cc.status in ('new','snoozed') order by cc.rank limit $2`, [b.id, n]);
   await loadBriefFacts(c, b.id, rows.flatMap((r) => tokensIn(String(r.why_template))));
   const lines = rows.map((r) => {
@@ -67,7 +74,7 @@ async function topCalls(c: Ctx, n = 5) {
     const body = sentence.startsWith(String(r.name)) ? sentence : `${r.name}: ${sentence}`;
     return `• ${body}${r.urgency === "now" ? " (call now)" : ""}`;
   });
-  return { lines, cards: rows.map((r) => ({ id: String(r.id), client: String(r.name) })) };
+  return { lines, cards: rows.map((r) => ({ id: String(r.id), client: String(r.name), clientId: String(r.client_id) })) };
 }
 
 async function marketMoves(c: Ctx) {
@@ -175,11 +182,22 @@ type Intent = { kind: "calls" } | { kind: "market" } | { kind: "followups" } | {
 
 const SECTORS = ["Semiconductors", "Technology", "Financials", "Healthcare", "Energy", "Industrials", "Utilities", "Consumer Discretionary", "Consumer Staples", "Communication Services", "Government", "Index Credit"];
 
+const DRAFT_VERB = /(draft|email|write|message|note to|compose)/;
+/** Words that point back at the client under discussion ("draft a note to them", "what about their book"). */
+const BACK_REF = /\b(them|they|their|theirs|him|his|her|hers|this client|that client|the client|same client)\b/;
+
 export async function route(c: Ctx, message: string): Promise<Intent> {
   const m = message.toLowerCase();
   const cl = await findClient(c, message);
-  if (cl && /(draft|email|write|message|note to|compose)/.test(m)) return { kind: "draft", client: cl };
+  if (cl && DRAFT_VERB.test(m)) return { kind: "draft", client: cl };
   if (cl) return { kind: "client", client: cl };
+  if (c.ctxClient) {
+    const wantsDraft = DRAFT_VERB.test(m) || /\bnote\b/.test(m);
+    if (wantsDraft || BACK_REF.test(m)) {
+      c.steps.push(`Continuing with ${c.ctxClient.name} from earlier in this conversation`);
+      return wantsDraft ? { kind: "draft", client: c.ctxClient } : { kind: "client", client: c.ctxClient };
+    }
+  }
   if (/follow.?up|owe|promised|overdue/.test(m)) return { kind: "followups" };
   const sector = SECTORS.find((s) => m.includes(s.toLowerCase())) ?? (m.includes("chip") ? "Semiconductors" : m.includes("rates") || m.includes("treasur") ? "Government" : null);
   if (sector && /(exposure|exposed|hold|holding|own|long|book|who)/.test(m)) return { kind: "exposure", term: sector };
@@ -199,27 +217,44 @@ const FOLLOW: Record<Intent["kind"], string[]> = {
   draft: ["Who should I call today?", "What moved overnight?"],
   help: ["Who should I call today?", "What moved overnight?", "Which open follow-ups am I behind on?"],
 };
+/** Follow-up chips name the client explicitly so they work without any conversation context. */
+function followupsFor(kind: Intent["kind"], subject?: { name: string }): string[] {
+  if (!subject) return FOLLOW[kind];
+  if (kind === "calls") return [`Draft a note to ${subject.name}`, ...FOLLOW.calls];
+  if (kind === "client") return [`Draft a note to ${subject.name}`, "Who should I call today?"];
+  if (kind === "draft") return [`Brief me on ${subject.name}`, ...FOLLOW.draft];
+  return FOLLOW[kind];
+}
 
 /** ---------------------------------------------------------------- answer */
 
-export async function answer(opts: { db: Db; meId: string; firstName: string; message: string; businessDate: string; complete?: Completer; useLlm?: boolean }): Promise<ChatAnswer> {
+export async function answer(opts: { db: Db; meId: string; firstName: string; message: string; businessDate: string; complete?: Completer; useLlm?: boolean; history?: HistoryTurn[]; clientId?: string }): Promise<ChatAnswer> {
   const message = opts.message.trim().slice(0, 500);
   // Not client data: only used to exclude names. Read first so the two transactions never nest.
   const restricted = new Set((await opts.db.asService((s) => s<{ id: string }>(`select distinct instrument_id id from events where entitlement = 'restricted_ib' and instrument_id is not null`))).map((r) => r.id));
   return opts.db.asUser(opts.meId, async (q) => {
     const c: Ctx = { q, meId: opts.meId, firstName: opts.firstName, facts: new Map(), restricted, steps: ["Understanding the question"], now: opts.businessDate };
+    // Client carried over from the conversation: the latest answer's subject, else the thread's scope. Read under RLS, so it must be one this person covers.
+    const history = (opts.history ?? []).slice(-6);
+    const carried = [...history].reverse().find((t) => t.role === "assistant" && t.meta?.clientId)?.meta?.clientId ?? opts.clientId;
+    if (carried && /^[0-9a-f-]{36}$/i.test(carried)) {
+      const [vis] = await q<{ id: string; name: string }>(`select id, name from clients where id = $1`, [carried]);
+      if (vis) c.ctxClient = { id: vis.id, name: vis.name };
+    }
     const intent = await route(c, message);
+    let subject: ChatAnswer["subject"];
 
     let lines: string[] = [];
     let draft: ChatAnswer["draft"];
     let lead = "";
     switch (intent.kind) {
-      case "calls": { const r = await topCalls(c); lines = r.lines; lead = "Here is where I would start today:"; break; }
+      case "calls": { const r = await topCalls(c); lines = r.lines; lead = "Here is where I would start today:"; if (r.cards[0]) subject = { id: r.cards[0].clientId, name: r.cards[0].client, explicit: false }; break; }
       case "market": { const r = await marketMoves(c); lines = r.lines; lead = r.lines.length ? "These are the biggest moves relative to a normal day:" : "Nothing is moving outside its normal range."; break; }
       case "followups": { const r = await followups(c); lines = r.lines; lead = "Your open follow-ups, oldest first:"; break; }
       case "exposure": { const r = await exposure(c, intent.term); lines = r.lines; break; }
-      case "client": { const r = await clientSummary(c, intent.client); lines = r.lines; break; }
+      case "client": { const r = await clientSummary(c, intent.client); lines = r.lines; subject = { ...intent.client, explicit: true }; break; }
       case "draft": {
+        subject = { ...intent.client, explicit: true };
         const d = await draftFor(c, intent.client);
         if (d) { draft = d; lines = [`I drafted a note for ${intent.client.name} from today's call card. Review it and send it yourself; I never send anything to a client.`]; }
         else lines = [`${intent.client.name} is not on today's call list, so there is nothing grounded to draft from. Ask me for a summary of the client instead.`];
@@ -243,8 +278,9 @@ export async function answer(opts: { db: Db; meId: string; firstName: string; me
 
     if ((opts.useLlm ?? true) && llmConfigured() && intent.kind !== "draft" && intent.kind !== "help") {
       const run = opts.complete ?? realComplete;
-      const sys = `You are the desk assistant inside a trading-desk tool. Answer the salesperson's question using ONLY the findings provided. HARD RULES: never write a digit, number word, percent sign, currency symbol or unit; every figure appears only as a {{fact_key}} token copied from the findings. No recommendations to buy or sell. Do not mention anything not in the findings. Be brief and direct. Return JSON {"answer": string}. Line breaks are allowed.`;
-      const user = JSON.stringify({ question: message, findings: rules });
+      const sys = `You are the desk assistant inside a trading-desk tool. Answer the salesperson's question using ONLY the findings provided. HARD RULES: never write a digit, number word, percent sign, currency symbol or unit; every figure appears only as a {{fact_key}} token copied from the findings. No recommendations to buy or sell. Do not mention anything not in the findings. Be brief and direct. Earlier turns, when given, are context only: use only {{tokens}} that appear in the findings. Return JSON {"answer": string}. Line breaks are allowed.`;
+      const earlier = history.map((t) => ({ role: t.role, text: t.text.slice(0, 600) }));
+      const user = JSON.stringify(earlier.length ? { question: message, findings: rules, earlier_turns: earlier } : { question: message, findings: rules });
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
           const res = await run({ system: sys, user: attempt === 1 ? user : user + "\nYour previous answer failed validation. Use only tokens that appear in the findings and no digits.", json: true, maxTokens: 700 });
@@ -267,6 +303,6 @@ export async function answer(opts: { db: Db; meId: string; firstName: string; me
       if (!v.ok) draft = undefined;
       else tokensIn(draft.template).forEach((t) => { const f = c.facts.get(t); if (f) facts[t] = view(f); });
     }
-    return { template, facts, followups: FOLLOW[intent.kind], steps: names, draft, generator, record, intent: intent.kind };
+    return { template, facts, followups: followupsFor(intent.kind, subject), steps: names, draft, generator, record, intent: intent.kind, subject };
   });
 }
