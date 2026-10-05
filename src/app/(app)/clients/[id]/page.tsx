@@ -44,6 +44,7 @@ export default async function Client360({ params }: { params: Promise<{ id: stri
             <dt className="text-muted">AUM</dt><dd className="num text-right font-semibold">{formatUsd(c.aumUsdMn * 1e6)}</dd>
             <dt className="text-muted">Tracked book</dt><dd className="num text-right font-semibold">{formatUsd(total)}</dd>
             <dt className="text-muted">Positions</dt><dd className="num text-right font-semibold">{d.positions.length}</dd>
+            {me.role === "sales" || me.role === "desk_head" ? <dd className="col-span-2 pt-1"><Button asChild variant="secondary" size="sm" className="w-full"><Link href={`/agent?client=${c.id}&q=${encodeURIComponent(`Brief me on ${c.name}`)}`}>Ask about this client</Link></Button></dd> : null}
           </dl>
         </CardBody>
         {d.card ? (

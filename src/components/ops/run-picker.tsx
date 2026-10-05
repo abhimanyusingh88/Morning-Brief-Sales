@@ -1,28 +1,19 @@
-"use client";
-import { usePathname, useRouter } from "next/navigation";
-import * as React from "react";
-import { fmtDate } from "@/lib/format";
+import Link from "next/link";
+import { cn } from "@/lib/cn";
+import type { RunRef } from "@/lib/data/ops";
 
-export interface RunOption { id: string; businessDate: string; status: string; trigger: string }
-
-/** Choose which morning run the page shows. The choice lives in the URL (?run=), so a view can be shared. */
-export function RunPicker({ runs, current }: { runs: RunOption[]; current: string }) {
-  const router = useRouter();
-  const path = usePathname();
-  const id = React.useId();
+/** Pick which morning run an operations screen reads; plain links so it works without client JS. */
+export function RunPicker({ runs, current, base }: { runs: RunRef[]; current: string | null; base: string }) {
+  if (runs.length < 2) return null;
   return (
-    <div className="flex items-center gap-2">
-      <label htmlFor={id} className="eyebrow">Run</label>
-      <select
-        id={id}
-        value={current}
-        onChange={(e) => router.push(`${path}?run=${e.target.value}`)}
-        className="h-8 max-w-[300px] cursor-pointer rounded-lg border border-line-strong bg-surface px-2.5 text-[13px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-      >
-        {runs.map((r) => (
-          <option key={r.id} value={r.id}>{fmtDate(r.businessDate, { weekday: "short", month: "short", day: "numeric" })} · {r.trigger} · {r.id.slice(0, 8)} · {r.status}</option>
-        ))}
-      </select>
-    </div>
+    <nav aria-label="Morning run" className="flex flex-wrap items-center gap-1.5">
+      <span className="eyebrow mr-1">Run</span>
+      {runs.slice(0, 6).map((r) => (
+        <Link key={r.id} href={`${base}?run=${r.id}`} aria-current={r.id === current ? "page" : undefined}
+          className={cn("num rounded-full border px-2.5 py-1 text-[12px] font-medium", r.id === current ? "border-brand/40 bg-brand-50 text-brand-600" : "border-line-strong text-ink-2 hover:bg-sunken")}>
+          {r.businessDate.slice(5)} · {new Date(r.startedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/New_York" })}
+        </Link>
+      ))}
+    </nav>
   );
 }
