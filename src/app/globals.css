@@ -95,3 +95,11 @@ body {
 .serif { font-family: var(--font-serif); }
 .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-subtle); }
 .hairline { border-color: var(--color-line); }
+
+/* ---- brief-ui (setup and brief screens) ----
+   The `* { border-color }` reset above is unlayered, so it beats Tailwind's layered border-colour utilities
+   (border-paper-line, divide-*, border-ink ...). Paper surfaces opt in to their own rule colours here. */
+.paper-surface, .paper-surface * { border-color: var(--color-paper-line); }
+.paper-surface .border-ink-rule { border-color: var(--color-ink); }
+.paper-surface .border-callout { border-color: var(--color-callout-line); }
+/* ---- end brief-ui ---- */

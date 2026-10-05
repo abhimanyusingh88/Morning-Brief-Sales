@@ -2,6 +2,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import { ShieldCheck } from "lucide-react";
 import * as React from "react";
+import { FEED_BY_KEY } from "@/lib/feeds/registry";
 
 export interface FactView {
   key: string;
@@ -10,6 +11,8 @@ export interface FactView {
   source: string;
   asOf: string;
   unit?: string;
+  /** the data feed this figure came from (brief_facts.feed_key) */
+  feedKey?: string;
 }
 
 const when = (iso: string) =>
@@ -21,7 +24,7 @@ export function Fact({ f }: { f: FactView }) {
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <span className="fact" tabIndex={0} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+        <span className="fact" tabIndex={0} onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)}>
           {f.display}
         </span>
       </Popover.Trigger>
@@ -30,6 +33,7 @@ export function Fact({ f }: { f: FactView }) {
           <p className="text-[11px] font-semibold uppercase tracking-wide text-subtle">{f.label}</p>
           <p className="num mt-0.5 text-base font-semibold text-ink">{f.display}</p>
           <dl className="mt-2 space-y-1 text-xs">
+            {f.feedKey && FEED_BY_KEY.get(f.feedKey) ? <div className="flex justify-between gap-3"><dt className="text-muted">Feed</dt><dd className="text-right font-medium text-ink-2">{FEED_BY_KEY.get(f.feedKey)!.name}</dd></div> : null}
             <div className="flex justify-between gap-3"><dt className="text-muted">Source</dt><dd className="text-right font-medium text-ink-2">{f.source}</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-muted">As of</dt><dd className="num text-right font-medium text-ink-2">{when(f.asOf)}</dd></div>
           </dl>
