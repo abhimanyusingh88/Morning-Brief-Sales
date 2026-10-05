@@ -6,6 +6,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/states";
 import type { BriefReview } from "@/lib/data/ops";
+import { emailPreviewHtml } from "@/components/brief/email-html";
 
 /** Hold or release one brief. The only effect is on our own brief and its deliveries; nothing goes to a client. */
 export function HoldRelease({ briefId, held, canAct }: { briefId: string; held: boolean; canAct: boolean }) {
@@ -31,9 +32,7 @@ export function HoldRelease({ briefId, held, canAct }: { briefId: string; held: 
   );
 }
 
-const tokenRe = /\{\{([^}]+)\}\}/g;
-
-/** A brief as its salesperson will see it, with every figure's source on hover. */
+/** The same paper-style digest used by the email preview, including held briefs. */
 export function ViewBrief({ briefId, name }: { briefId: string; name: string }) {
   const [open, setOpen] = React.useState(false);
   const [data, setData] = React.useState<BriefReview | null>(null);
@@ -49,30 +48,14 @@ export function ViewBrief({ briefId, name }: { briefId: string; name: string }) 
       <Dialog.Trigger asChild><Button size="sm" variant="ghost" aria-label={`View ${name}'s brief`}><Eye size={14} strokeWidth={1.5} /> View</Button></Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-ink/30" />
-        <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex w-[min(640px,100vw)] flex-col border-l border-line bg-surface shadow-pop focus:outline-none">
+        <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex w-[min(800px,100vw)] flex-col border-l border-line bg-surface shadow-pop focus:outline-none">
           <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
-            <div><Dialog.Title className="text-[15px] font-semibold text-ink">{name}&apos;s brief</Dialog.Title><Dialog.Description className="text-[12.5px] text-muted">As the salesperson would see it. Hover a figure for its source.</Dialog.Description></div>
+            <div><Dialog.Title className="text-[15px] font-semibold text-ink">{name}&apos;s brief</Dialog.Title><Dialog.Description className="text-[12.5px] text-muted">Morning brief preview · nothing is sent</Dialog.Description></div>
             <Dialog.Close className="cursor-pointer rounded-md p-1 text-muted hover:bg-sunken" aria-label="Close"><X size={16} /></Dialog.Close>
           </div>
-          <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
+          <div className="flex min-h-0 flex-1 flex-col">
             {err ? <ErrorState title="Could not load this brief" body={err} /> : !data ? <p className="text-[13px] text-muted" aria-busy>Loading…</p> : (
-              <>
-                {data.brief.headline ? <p className="serif text-[20px] leading-snug text-ink">{data.brief.headline.replace(tokenRe, (_, k: string) => data.facts[k]?.display ?? "")}</p> : null}
-                {data.sections.map((s) => (
-                  <section key={s.id}>
-                    <h3 className="eyebrow mb-1">{s.title}</h3>
-                    {s.status === "unavailable" ? <p className="text-[13px] text-amber">{s.note ?? "Data temporarily unavailable."}</p> : (
-                      <p className="text-[13.5px] leading-relaxed text-ink-2">
-                        {s.template.split(tokenRe).map((part, i) => {
-                          if (i % 2 === 0) return part;
-                          const f = data.facts[part];
-                          return <span key={i} className="num rounded bg-sunken px-0.5 font-medium text-ink" title={f ? `${f.label} · ${f.source} · ${f.asOf}` : part}>{f?.display ?? part}</span>;
-                        })}
-                      </p>
-                    )}
-                  </section>
-                ))}
-              </>
+              <iframe title="QC brief preview" srcDoc={emailPreviewHtml(data.previewHtml)} sandbox="" className="min-h-0 w-full flex-1 border-0" />
             )}
           </div>
         </Dialog.Content>

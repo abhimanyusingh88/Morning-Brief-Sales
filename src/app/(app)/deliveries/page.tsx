@@ -28,7 +28,7 @@ export default async function Deliveries({ searchParams }: { searchParams: Promi
   const v = await getDeliveriesView(await getDb(), me.id, (await searchParams).run);
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Operations" title="Deliveries" description="Where each published brief goes at its send time: the dashboard, and an email digest through a simulated relay. The agent drafts; nothing here is sent to a client." actions={<RunPicker runs={v.runs} current={v.run?.id ?? null} base="/deliveries" />} />
+      <PageHeader eyebrow="Operations" title="Deliveries" description="Track dashboard publication and prepared email digests for each salesperson." actions={<RunPicker runs={v.runs} current={v.run?.id ?? null} base="/deliveries" />} />
       {!v.run || (v.rows.length === 0 && v.held.length === 0) ? (
         <Card><EmptyState title="No deliveries yet" body="Deliveries are scheduled when a morning run publishes briefs." /></Card>
       ) : (

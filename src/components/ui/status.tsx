@@ -8,7 +8,7 @@ const DOT: Record<Tone, string> = { ok: "bg-up", warn: "bg-amber", bad: "bg-down
 export function Status({ tone, children, className }: { tone: Tone; children: React.ReactNode; className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-1.5 text-[12px] font-medium text-ink-2", className)}>
-      <span className={cn("h-1.5 w-1.5 rounded-full", DOT[tone])} aria-hidden />
+      <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", DOT[tone])} aria-hidden />
       {children}
     </span>
   );

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { RichText } from "@/components/ui/fact";
 import { EmptyState } from "@/components/ui/states";
+import { PageHeader } from "@/components/ui/page-header";
 import { getMe } from "@/lib/auth/session";
 import { bootState } from "@/lib/bootstrap";
 import { getBundle, getMarketTiles, getPulse } from "@/lib/data/brief";
@@ -45,21 +46,14 @@ export default async function Today() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-[12.5px] font-medium text-muted">{fmtDate(brief.businessDate)}</p>
-          <h1 className="mt-0.5 text-[26px] font-semibold tracking-[-0.02em]">Good morning, {first}</h1>
-          <p className="mt-1 max-w-2xl text-[14.5px] text-ink-2">{brief.headline}</p>
-        </div>
-        <div className="flex gap-2">
+      <PageHeader eyebrow={fmtDate(brief.businessDate)} title={`Good morning, ${first}`} description={brief.headline} actions={<>
           <Button asChild variant="secondary"><Link href="/brief">Read full brief</Link></Button>
           <Button asChild variant="primary"><Link href="/calls"><PhoneCall size={15} /> Start calling</Link></Button>
-        </div>
-      </header>
+      </>} />
 
       <MarketStrip tiles={tiles} />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <Card className="overflow-hidden">
           <CardHeader
             title="Who to call"

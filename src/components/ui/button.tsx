@@ -14,7 +14,7 @@ const button = cva(
         danger: "bg-down text-white hover:opacity-90",
         dark: "bg-navy text-white hover:bg-navy-2",
       },
-      size: { sm: "h-8 px-3 text-[13px]", md: "h-9 px-3.5 text-sm", lg: "h-11 px-5 text-[15px]", icon: "h-8 w-8" },
+      size: { sm: "h-8 px-3 text-[12px]", md: "h-9 px-4 text-[13px]", lg: "h-11 px-5 text-[14px]", icon: "h-9 w-9" },
     },
     defaultVariants: { variant: "secondary", size: "md" },
   },

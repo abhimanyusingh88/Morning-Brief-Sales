@@ -9,7 +9,7 @@ import { ALL_PRODUCTS, INCLUDE_TOGGLES, PRODUCT_GROUPS, SPEC_SECTORS, type Brief
 
 const DELIVERY: { key: Delivery; label: string; hint: string }[] = [
   { key: "dashboard", label: "Dashboard", hint: "Opens in the app at your send time" },
-  { key: "email", label: "Email digest", hint: "A copy lands in your inbox (preview only in this demo)" },
+  { key: "email", label: "Email digest", hint: "An email version of your brief, available as a preview" },
   { key: "both", label: "Both", hint: "Dashboard and email digest" },
 ];
 

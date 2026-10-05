@@ -23,7 +23,7 @@ export function UserMenu({ name, title, initials, hue }: { name: string; title: 
       </Dropdown.Trigger>
       <Dropdown.Portal>
         <Dropdown.Content align="end" sideOffset={6} className="z-50 min-w-[200px] rounded-lg border border-line bg-surface p-1 shadow-[var(--shadow-pop)]">
-          <Dropdown.Item onSelect={out} className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-[13px] outline-none data-[highlighted]:bg-sunken"><Repeat size={14} /> Switch persona</Dropdown.Item>
+          <Dropdown.Item onSelect={out} className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-[13px] outline-none data-[highlighted]:bg-sunken"><Repeat size={14} /> Switch account</Dropdown.Item>
           <Dropdown.Item onSelect={out} className="flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-[13px] outline-none data-[highlighted]:bg-sunken"><LogOut size={14} /> Sign out</Dropdown.Item>
         </Dropdown.Content>
       </Dropdown.Portal>

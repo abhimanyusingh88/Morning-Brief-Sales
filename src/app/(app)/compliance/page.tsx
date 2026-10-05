@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/states";
+import { PageHeader } from "@/components/ui/page-header";
 import { getMe } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { fmtDate, fmtTimeET, timeAgo } from "@/lib/format";
@@ -34,10 +35,7 @@ export default async function Compliance() {
   const val = ((d.run?.summary as Record<string, unknown>)?.validation ?? {}) as Record<string, number>;
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-[24px] font-semibold tracking-[-0.02em]">Compliance console</h1>
-        <p className="mt-0.5 text-[13.5px] text-muted">What the system did, what it refused to do, and the record of both.</p>
-      </header>
+      <PageHeader eyebrow="Oversight" title="Compliance console" description="Review active controls, information barriers and the audit trail behind generated insights." />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -50,9 +48,9 @@ export default async function Compliance() {
           <Card>
             <CardHeader title="Information barrier" sub="Restricted-list names are withheld from every salesperson's output" />
             {d.restricted.length ? (
-              <table className="w-full text-[13px]"><tbody className="divide-y divide-line">
+              <div className="scroll-thin overflow-x-auto"><table className="w-full min-w-[440px] text-[13px]"><tbody className="divide-y divide-line">
                 {d.restricted.map((r, i) => <tr key={i}><td className="px-5 py-2.5"><span className="font-semibold">{String(r.name ?? r.title)}</span> <span className="mono text-[11.5px] text-subtle">{String(r.symbol ?? "")}</span></td><td className="px-3 py-2.5 text-muted">{String(r.title)}</td><td className="num whitespace-nowrap px-5 py-2.5 text-right text-muted">{fmtDate(String(r.bd), { month: "short", day: "numeric" })}</td></tr>)}
-              </tbody></table>
+              </tbody></table></div>
             ) : <EmptyState title="Restricted list is empty" />}
             {(d.barrier?.log as string[] | undefined)?.length ? <p className="border-t border-line px-5 py-3 text-[12.5px] text-muted">Last run: {(d.barrier!.log as string[]).filter((l) => /restricted/i.test(l)).join(" ")}</p> : null}
           </Card>
@@ -71,12 +69,12 @@ export default async function Compliance() {
         <Card className="overflow-hidden">
           <CardHeader title="Model calls" sub="Lineage for generated text" />
           {d.recs.length ? (
-            <table className="w-full text-[12.5px]">
+            <div className="scroll-thin overflow-x-auto"><table className="w-full min-w-[440px] text-[12.5px]">
               <thead className="bg-bg text-left text-muted"><tr><th className="px-5 py-2 font-medium">Target</th><th className="px-3 py-2 font-medium">Model</th><th className="px-3 py-2 font-medium">Result</th><th className="px-5 py-2 text-right font-medium">Tokens</th></tr></thead>
               <tbody className="divide-y divide-line">
                 {d.recs.map((r, i) => <tr key={i}><td className="max-w-[160px] truncate px-5 py-2">{String(r.target).split(":")[0]}</td><td className="px-3 py-2 text-ink-2">{String(r.model)}</td><td className="px-3 py-2"><Badge tone={r.status === "accepted" ? "up" : r.status === "repaired" ? "brand" : "amber"}>{String(r.status)}</Badge></td><td className="num px-5 py-2 text-right">{(Number(r.prompt_tokens ?? 0) + Number(r.completion_tokens ?? 0)).toLocaleString()}</td></tr>)}
               </tbody>
-            </table>
+            </table></div>
           ) : <EmptyState title="No model calls recorded" body="The template writer produced the latest briefs, so there is nothing to trace." />}
         </Card>
         <Card className="overflow-hidden">

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Chip } from "@/components/ui/chip";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/cn";
+import { fmtDate } from "@/lib/format";
 import { FEEDS } from "@/lib/feeds/registry";
 import { CATEGORY_LABEL, CATEGORY_ORDER } from "./model";
 import { Segmented } from "./segmented";
@@ -44,7 +45,7 @@ export function ControlBar({ scenarios, defaults, canRun, running, onStarted }: 
   /** a run was started, or an already running one was found: show it */
   onStarted: (runId: string) => void;
 }) {
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<{ message: string; runId?: string } | null>(null);
   const [ai, setAi] = React.useState<Ai | null>(null);
@@ -92,7 +93,7 @@ export function ControlBar({ scenarios, defaults, canRun, running, onStarted }: 
 
   const summary = [
     s.timelapse ? "Time-lapse" : "Instant",
-    s.useLlm ? (s.bypassCache ? "model, fresh calls" : "model, replayed") : "template writer",
+    s.useLlm ? (s.bypassCache ? "Fresh model calls" : "Stored model output") : "Template writer",
     ...(problems.length ? [`${problems.length} feed problem${problems.length > 1 ? "s" : ""}`] : []),
     ...(s.qcFlag ? ["QC holds one"] : []),
   ].join(" · ");
@@ -101,16 +102,16 @@ export function ControlBar({ scenarios, defaults, canRun, running, onStarted }: 
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-4">
         <div className="min-w-0">
-          <h2 className="text-[13px] font-semibold text-ink">Run the morning</h2>
+          <h2 className="text-[14px] font-semibold text-ink">Run configuration</h2>
           <p className="mt-0.5 text-xs text-muted">
-            {open ? "Plays the whole morning for the day below, from the 04:00 data pull to the 06:30 delivery." : summary}
+            {fmtDate(s.date, { month: "short", day: "numeric", year: "numeric" })} · {summary}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="run-options">
             Options <ChevronDown size={14} strokeWidth={1.5} className={cn("transition-transform", open && "rotate-180")} />
           </Button>
-          <Button variant="primary" size="lg" onClick={start} disabled={disabled} title={canRun ? undefined : "Only an administrator or a desk head can run the morning"}>
+          <Button variant="primary" size="md" onClick={start} disabled={disabled} title={canRun ? undefined : "Only an administrator or a desk head can run the morning"}>
             {busy || running ? <Loader2 size={16} strokeWidth={1.5} className="animate-spin" /> : <Play size={16} strokeWidth={1.5} />}
             {busy ? "Starting" : running ? "Running" : "Run the morning"}
           </Button>
@@ -181,7 +182,7 @@ export function ControlBar({ scenarios, defaults, canRun, running, onStarted }: 
               <Row id="sw-fresh" title="Fresh model calls" hint={s.useLlm && modelUsable ? (s.bypassCache ? "Calls the model again for every item. Slower, and the wording can change." : "Off: replays stored model output. Instant and the same every time.") : "Applies only when the model is used."}>
                 <Switch label="Fresh model calls" checked={s.bypassCache} onCheckedChange={(v) => set("bypassCache", v)} disabled={!(s.useLlm && modelUsable)} />
               </Row>
-              <Row id="sw-qc" title="Spot-check holds one brief" hint="The simulated reviewer holds one sampled brief, so you can show hold and release.">
+              <Row id="sw-qc" title="Spot-check holds one brief" hint="Hold one sampled brief to review the hold-and-release workflow.">
                 <Switch label="Spot-check holds one brief" checked={s.qcFlag} onCheckedChange={(v) => set("qcFlag", v)} />
               </Row>
             </div>

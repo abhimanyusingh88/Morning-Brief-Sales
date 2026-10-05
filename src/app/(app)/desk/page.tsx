@@ -4,6 +4,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/states";
+import { PageHeader } from "@/components/ui/page-header";
 import { getMe } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { formatUsd } from "@/lib/market/format";
@@ -46,10 +47,7 @@ export default async function Desk() {
   const maxTheme = Math.max(1, ...themes.map((t) => Number(t.n)));
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-[24px] font-semibold tracking-[-0.02em]">{me.deskName ?? "Firm"} overview</h1>
-        <p className="mt-0.5 text-[13.5px] text-muted">How the desk&apos;s mornings are going: coverage, calls made, and what everyone is talking about.</p>
-      </header>
+      <PageHeader eyebrow="Desk" title={`${me.deskName ?? "Firm"} overview`} description="Coverage, call progress and the stories shaping your team's morning." />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {[["Salespeople", String(reps.length)], ["Calls on lists", String(totalCards)], ["Marked as called", String(totalDone)], ["Completion", totalCards ? `${Math.round((totalDone / totalCards) * 100)}%` : "—"]].map(([k, v]) => (
@@ -61,7 +59,7 @@ export default async function Desk() {
         <Card className="overflow-hidden">
           <CardHeader title="Team" sub="Latest brief for each person" />
           {reps.length ? (
-            <table className="w-full text-[13px]">
+            <div className="scroll-thin overflow-x-auto"><table className="w-full min-w-[600px] text-[13px]">
               <thead className="bg-bg text-left text-[12px] text-muted"><tr><th className="px-5 py-2 font-medium">Salesperson</th><th className="px-3 py-2 text-right font-medium">Clients</th><th className="px-3 py-2 text-right font-medium">Book</th><th className="px-3 py-2 text-right font-medium">Calls</th><th className="px-3 py-2 text-right font-medium">Now</th><th className="px-5 py-2 text-right font-medium">Done</th></tr></thead>
               <tbody className="divide-y divide-line">
                 {reps.map((r) => (
@@ -75,7 +73,7 @@ export default async function Desk() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           ) : <EmptyState title="No salespeople on this desk" />}
         </Card>
 

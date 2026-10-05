@@ -272,6 +272,7 @@ export async function getQcView(db: Db, meId: string, requestedRun?: string | nu
 export interface ReviewSection { id: string; kind: string; position: number; title: string; template: string; status: "ok" | "unavailable"; note: string | null; generator: string; factKeys: string[] }
 export interface ReviewFact { key: string; label: string; display: string; unit?: string; source: string; asOf: string }
 export interface BriefReview {
+  previewHtml: string;
   brief: { id: string; profileId: string; name: string; title: string; desk: string | null; businessDate: string; status: string; qcStatus: string; headline: string; generatedAt: string; publishedAt: string | null; version: number };
   sections: ReviewSection[];
   facts: Record<string, ReviewFact>;
@@ -284,10 +285,25 @@ export async function getBriefForReview(db: Db, meId: string, briefId: string): 
       `select b.id, b.profile_id, p.full_name, p.title, d.name desk, b.business_date::text bd, b.status, b.qc_status, b.headline, b.generated_at, b.published_at, b.version
          from briefs b join profiles p on p.id = b.profile_id left join desks d on d.id = p.desk_id where b.id = $1`, [briefId]))[0];
     if (!b) return null;
-    const secs = await q(`select id, kind, position, title, body_template, status, note, generator, fact_keys from brief_sections where brief_id = $1 order by position, id`, [briefId]);
+    const secs = await q(`select id, kind, position, title, body_template, data, status, note, generator, fact_keys from brief_sections where brief_id = $1 order by position, id`, [briefId]);
     const keys = [...new Set(secs.flatMap((s) => (s.fact_keys as string[]) ?? []))];
     const facts = keys.length ? await q(`select key, label, display, unit, source, as_of from brief_facts where brief_id = $1 and key = any($2::text[])`, [briefId, keys]) : [];
+    const [email] = await q<{ html: string }>(`select html from deliveries where brief_id = $1 and channel = 'email' and html is not null order by scheduled_for desc limit 1`, [briefId]);
+    const sections: BuiltSection[] = secs.filter(s => (SECTION_ORDER as readonly string[]).includes(String(s.kind))).map(s => ({
+      kind: String(s.kind), title: String(s.title), status: s.status as BuiltSection["status"], note: (s.note as string) ?? undefined,
+      template: String(s.body_template ?? ""), data: (s.data as Record<string, unknown>) ?? {}, generator: s.generator as BuiltSection["generator"], feeds: [],
+    }));
+    const list = (value: unknown) => Array.isArray(value) ? value.map(String) : [];
+    const sectors = sections.map(s => list(s.data.sectors)).find(values => values.length) ?? [];
+    const products = sections.map(s => list(s.data.products)).find(values => values.length) ?? [];
+    const previewHtml = email?.html ?? renderDigest({
+      name: String(b.full_name), date: String(b.bd), dateLabel: `${String(b.bd)} · ${b.published_at ? new Date(b.published_at as string).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' }) + ' ET' : 'Pending quality review'}`,
+      sectors, products, oneLine: String(sections.find(s => s.kind === 'catalysts')?.data.oneLine ?? ''), sections,
+      facts: Object.fromEntries(facts.map(f => [String(f.key), { display: String(f.display), unit: f.unit ? String(f.unit) : undefined }])),
+      generatedAt: `Generated ${new Date(b.generated_at as string).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })} ET`,
+    }).html;
     return {
+      previewHtml,
       brief: { id: String(b.id), profileId: String(b.profile_id), name: String(b.full_name), title: String(b.title), desk: (b.desk as string) ?? null, businessDate: String(b.bd), status: String(b.status), qcStatus: String(b.qc_status), headline: String(b.headline ?? ""), generatedAt: iso(b.generated_at), publishedAt: isoOrNull(b.published_at), version: Number(b.version) },
       sections: secs.map((s) => ({ id: String(s.id), kind: String(s.kind), position: Number(s.position), title: String(s.title), template: String(s.body_template ?? ""), status: s.status as ReviewSection["status"], note: (s.note as string) ?? null, generator: String(s.generator), factKeys: (s.fact_keys as string[]) ?? [] })),
       facts: Object.fromEntries(facts.map((f) => [String(f.key), { key: String(f.key), label: String(f.label), display: String(f.display), unit: f.unit ? String(f.unit) : undefined, source: String(f.source), asOf: iso(f.as_of) }])),

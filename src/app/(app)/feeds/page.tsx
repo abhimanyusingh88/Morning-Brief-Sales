@@ -80,7 +80,7 @@ export default async function Feeds() {
   const s = v.stats;
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Operations" title="Data feeds" description="Every connector the morning run reads, its health against the SLA, what it stored, and what the firm would provide to take it live. All feeds here are simulated." />
+      <PageHeader eyebrow="Operations" title="Data feeds" description="Track connector health, freshness and the data available to your morning workflow." />
       {!v.run ? (
         <Card><EmptyState title="No morning run yet" body="Run the morning from the Morning run screen and every connector will report here." /></Card>
       ) : (

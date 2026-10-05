@@ -47,7 +47,7 @@ export function History({ runs, selectedId, onSelect }: { runs: HistoryRow[]; se
                       <button type="button" onClick={(e) => { e.stopPropagation(); onSelect(r.id); }} className="cursor-pointer rounded font-medium text-ink hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">{started(r.startedAt)}</button>
                     </td>
                     <td className="num px-3 py-2 text-ink-2">{fmtDate(r.businessDate, { month: "short", day: "numeric" })}</td>
-                    <td className="px-3 py-2 capitalize text-ink-2">{r.trigger}</td>
+                    <td className="px-3 py-2 capitalize text-ink-2">{r.trigger === "demo" ? "Manual" : r.trigger}</td>
                     <td className="px-3 py-2"><Status tone={t.tone}>{t.label}</Status></td>
                     <td className="num px-3 py-2 text-right text-ink-2">{r.status === "running" ? "—" : fmtDuration(r.durationMs)}</td>
                     <td className="num px-3 py-2 text-right text-ink-2">{r.published == null ? "—" : <>{fmtInt(r.published)}{r.held ? <span className="text-amber"> · {r.held} held</span> : null}</>}</td>

@@ -62,7 +62,7 @@ export function ResultPanel({ view, role }: { view: RunView; role: string }) {
         sub={`Business date ${view.businessDate ?? ""}. Every figure in the briefs carries its source feed and as-of time.`}
         right={<Status tone={held || feedDown || emailFailed ? "warn" : "ok"}>{held || feedDown || emailFailed ? "Complete, with exceptions" : "Complete"}</Status>}
       />
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-5 px-5 py-5 sm:grid-cols-3 lg:grid-cols-6">
+      <dl className="grid grid-cols-2 gap-x-8 gap-y-6 px-5 py-5 sm:grid-cols-3 2xl:grid-cols-6">
         <Tile label="Duration" figure={fmtDuration(num(sum.durationMs))} caption={sum.timelapse ? "Time-lapse" : "Instant"} />
         <Tile label="Briefs" figure={<>{briefs == null ? "—" : fmtInt(briefs)}<span className="text-[13px] font-normal text-muted"> published</span></>} caption={held ? `${fmtInt(held)} held by QC, not published or emailed` : "None held"} />
         <Tile label="Call cards" figure={cards == null ? "—" : fmtInt(cards)} caption="in published briefs" />

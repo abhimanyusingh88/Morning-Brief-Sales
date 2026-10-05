@@ -56,7 +56,7 @@ export default async function BriefPage({ searchParams }: { searchParams: Promis
     <BriefChrome initialAudit={audit} audit={<AuditTable keys={keys} facts={facts} version={brief.version} generatedAt={brief.generatedAt} />}>
       <article className="paper-surface rounded-[12px] border border-paper-line bg-paper px-5 py-7 sm:px-10 sm:py-9 print:border-0 print:p-0">
         <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-ink-rule pb-2.5">
-          <h1 className="serif text-[34px] italic leading-none tracking-[-0.01em] text-ink">Morning brief</h1>
+          <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.025em] text-ink">Morning brief</h1>
           <p className="mono text-[12px] text-muted">{stamp}</p>
         </header>
         <p className="mt-3 text-[12.5px] leading-relaxed text-muted">
@@ -71,7 +71,7 @@ export default async function BriefPage({ searchParams }: { searchParams: Promis
         </div>
 
         <p className="mt-10 border-t border-paper-line pt-4 text-[11.5px] leading-relaxed text-muted">
-          Generated {etTime(brief.generatedAt)} from simulated market, news and calendar feeds, filtered to your saved sectors and products.
+          Generated {etTime(brief.generatedAt)} from market, news and calendar feeds, filtered to your saved sectors and products. Source details are available in audit view.
         </p>
       </article>
 

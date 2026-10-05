@@ -11,7 +11,7 @@ const INDEX_SYMBOLS = new Set(["SPX", "NDX"]);
 
 export function MarketStrip({ tiles }: { tiles: Tile[] }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-8">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 2xl:grid-cols-8">
       {tiles.map((t) => {
         // For yields and spreads, "up" is worse for holders; colour follows the move direction, not a judgement.
         const dir = Math.abs(t.chg) < 0.005 ? 0 : t.chg > 0 ? 1 : -1;

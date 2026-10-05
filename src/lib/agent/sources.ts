@@ -1,5 +1,6 @@
 import type { Db } from "@/lib/db";
 import { isUuid } from "./threads";
+import { agentBriefs, agentCalls } from "./briefs";
 
 export type SourceTone = "ok" | "warn" | "bad" | "idle";
 export interface SourceRow {
@@ -63,10 +64,8 @@ export interface StarterContext { topClients: { id: string; name: string }[]; sc
 /** Real names from the latest brief for the empty-state prompts, and the client for a deep link (only if the person can see it). */
 export async function starterContext(db: Db, meId: string, clientId?: string | null): Promise<StarterContext> {
   return db.asUser(meId, async (q) => {
-    const top = await q<{ id: string; name: string }>(
-      `select cl.id, cl.name from call_cards cc join clients cl on cl.id = cc.client_id
-        where cc.brief_id = (select id from briefs where profile_id = $1 order by business_date desc limit 1) and cc.profile_id = $1 and cc.status in ('new','snoozed')
-        order by cc.rank limit 3`, [meId]);
+    const briefs = await agentBriefs(q, meId);
+    const top = (await agentCalls(q, briefs.ids, briefs.desk, 3)).map((card) => ({ id: card.client_id, name: card.name }));
     const scoped = clientId && isUuid(clientId) ? (await q<{ id: string; name: string }>(`select id, name from clients where id = $1`, [clientId]))[0] ?? null : null;
     return { topClients: top, scopedClient: scoped };
   });

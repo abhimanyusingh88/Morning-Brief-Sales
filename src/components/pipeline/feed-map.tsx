@@ -72,7 +72,7 @@ export function FeedMap({ view }: { view: RunView }) {
           return (
             <section key={c} aria-label={CATEGORY_LABEL[c]}>
               <h4 className="eyebrow mb-2">{CATEGORY_LABEL[c]}</h4>
-              <ul className="grid gap-2.5 sm:grid-cols-2">
+              <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {list.map((d) => <FeedCard key={d.key} def={d} view={view} ingestDone={ingestDone} onOpen={() => setOpen(d.key)} />)}
               </ul>
             </section>

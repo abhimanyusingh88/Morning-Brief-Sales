@@ -89,5 +89,25 @@ describe("chat assistant", () => {
   it("gives a desk head the same safe behaviour on their own coverage", async () => {
     const a = await ask(delaney, "Who should I call today?");
     clean(a);
+    expect(a.template).toContain("•");
+    expect(a.subject).toBeTruthy();
+    expect(Object.keys(a.facts).length).toBeGreaterThan(0);
+    const visible = await db.asUser(delaney, q => q<{ id: string }>("select id from clients"));
+    expect(visible.map(client => client.id)).toContain(a.subject!.id);
+    const draft = await ask(delaney, `Draft a note to ${a.subject!.name}`);
+    expect(draft.draft).toBeTruthy();
+    clean(draft);
+  });
+
+  it("does not use an unpublished brief for call recommendations", async () => {
+    await db.asService(q => q("update briefs set status = 'draft' where profile_id = $1", [rahman]));
+    try {
+      const a = await ask(rahman, "Who should I call first this morning, and why?");
+      expect(a.subject).toBeUndefined();
+      expect(a.template).toContain("No published brief");
+      expect(a.template).not.toContain("Here is where I would start");
+    } finally {
+      await db.asService(q => q("update briefs set status = 'published' where profile_id = $1", [rahman]));
+    }
   });
 });
