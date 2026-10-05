@@ -1,4 +1,5 @@
-@import "tailwindcss" source("../");
+@import "tailwindcss";
+@source "../";
 
 @theme inline {
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
