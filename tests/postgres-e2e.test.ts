@@ -22,12 +22,12 @@ beforeAll(async () => {
 afterAll(async () => { await db?.close(); await server?.stop(); await pg?.close(); });
 
 describe("pipeline through postgres.js", () => {
-  it("runs all 13 steps, persists logs and publishes briefs", async () => {
+  it("runs every step, persists logs and publishes briefs", async () => {
     const r = await runPipeline({ db, businessDate: "2026-10-05", trigger: "manual", useLlm: false });
     expect(r.summary.error).toBeUndefined();
     expect(r.status).toBe("succeeded");
     const steps = await db.asService((q) => q<{ status: string; log: string[]; detail: { ms?: number } }>(`select status, log, detail from pipeline_steps where run_id = $1 order by seq`, [r.runId]));
-    expect(steps).toHaveLength(13);
+    expect(steps).toHaveLength(17);
     expect(steps.every((s) => s.status === "succeeded")).toBe(true);
     expect(steps[0].log.length).toBeGreaterThan(0);
     expect(typeof steps[0].detail.ms).toBe("number"); // jsonb round-trips as an object, not a string

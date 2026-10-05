@@ -26,6 +26,8 @@ export interface Completion {
   promptTokens: number | null;
   completionTokens: number | null;
   latencyMs: number;
+  /** replayed from the model-output cache */
+  cached?: boolean;
 }
 
 export interface CompleteOptions {

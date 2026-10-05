@@ -249,6 +249,7 @@ const CONNECTORS: Record<string, Connector> = {
         idx += 1;
       }
     }
+    const scenarioCount = rows.length;
     // the rest of the overnight tape: headlines across sectors and products
     pickNews(date).forEach((t, n) => {
       const cands = t.sector ? eq.filter((e) => e.sector === t.sector) : [];
@@ -261,9 +262,15 @@ const CONNECTORS: Record<string, Connector> = {
       });
     });
     // the aggregator tags most items; a few arrive untagged and are tagged in stage two
-    rows.forEach((r, i) => { if (!r.instrumentId && r.sector && i % 5 === 0) { r.payload = { untagged: true }; } });
+    let untagged = 0;
+    rows.forEach((r, i) => {
+      if (r.kind === "news" && r.feedKey === "news_agg" && r.source === "Simulated newswire" && i % 5 === 3 && i >= scenarioCount) {
+        Object.assign(r, { instrumentId: null, sector: null, tags: [], products: [], payload: { untagged: true } });
+        untagged += 1;
+      }
+    });
     await insertEvents(q, date, rows);
-    return { rows: rows.length, asOf: etInstant(date, 4, 0, 8), sample: rows.slice(0, 3).map((r) => ({ title: r.title, sector: r.sector, products: r.products })), detail: { storylines: scenarios }, store: "events (kind=news|macro|flow)" };
+    return { rows: rows.length, asOf: etInstant(date, 4, 0, 8), sample: rows.slice(0, 3).map((r) => ({ title: r.title, sector: r.sector, products: r.products })), detail: { storylines: scenarios, untagged }, store: "events (kind=news|macro|flow)" };
   },
 
   async corp_actions({ q, date, rng }) {

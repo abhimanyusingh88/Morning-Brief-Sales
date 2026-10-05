@@ -21,7 +21,7 @@ export interface WriteRecord {
 
 export type Generator = "llm" | "hybrid" | "template";
 
-const RULES = `You write for a salesperson on an institutional trading desk, in plain, specific, trader-to-trader language.
+export const RULES = `You write for a salesperson on an institutional trading desk, in plain, specific, trader-to-trader language.
 HARD RULES — output is machine-checked and rejected if any is broken:
 1. You never write a digit, a number word (two, three, half, double...), a percent sign, a currency symbol or a unit such as bp. Every number, level, size, date and time comes from a fact token written exactly as {{fact_key}}. Use only the keys listed. Never invent a key.
 2. Never make up facts: only use what is in the input. If something is not given, leave it out.
@@ -30,8 +30,8 @@ HARD RULES — output is machine-checked and rejected if any is broken:
 5. Short sentences. No filler, no greetings except where asked, no emojis.
 Return only a JSON object.`;
 
-const fenced = (s: string) => s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
-const tryJson = (s: string): Record<string, unknown> | null => {
+export const fenced = (s: string) => s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+export const tryJson = (s: string): Record<string, unknown> | null => {
   try {
     const v = JSON.parse(fenced(s));
     return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
@@ -39,10 +39,10 @@ const tryJson = (s: string): Record<string, unknown> | null => {
     return null;
   }
 };
-const strs = (v: unknown, max: number): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, max) : []);
-const str = (v: unknown): string => (typeof v === "string" ? v : "");
+export const strs = (v: unknown, max: number): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, max) : []);
+export const str = (v: unknown): string => (typeof v === "string" ? v : "");
 
-const factLine = (f: Fact) => `- ${f.key}: ${f.label}${f.hint ? ` (${f.hint})` : ""}${f.unit === "text" ? " [text]" : ""}`;
+export const factLine = (f: Fact) => `- ${f.key}: ${f.label}${f.hint ? ` (${f.hint})` : ""}${f.unit === "text" ? " [text]" : ""}`;
 
 /** ---------------------------------------------------------------- cards */
 
@@ -134,10 +134,12 @@ export async function writeCard(c: CardContext, p: Prepared, deps: { complete?: 
 
 /** ---------------------------------------------------------------- brief sections */
 
-export const briefKeys = (p: Prepared) => new Set(p.facts.keys().filter((k) => !/^c\d+\./.test(k)));
+/** Facts the call-list brief may use: not the per-card facts, and not the market-brief facts (those have their own writer). */
+export const briefKeys = (p: Prepared) => new Set(p.facts.keys().filter((k) => !/^(c\d+\.|sp\.|fut\.|breadth\.|sent\.|fed\.)/.test(k)));
 
-export async function writeBrief(p: Prepared, deps: { complete?: Completer } = {}): Promise<{ text: BriefText; generators: Record<string, Generator>; record: WriteRecord }> {
+export async function writeBrief(p: Prepared, deps: { complete?: Completer; kinds?: string[] } = {}): Promise<{ text: BriefText; generators: Record<string, Generator>; record: WriteRecord }> {
   const base = templateBrief(p.brief);
+  if (deps.kinds) base.sections = base.sections.filter((s) => deps.kinds!.includes(s.kind));
   const run = deps.complete ?? realComplete;
   const allowed = briefKeys(p);
   const facts = p.facts.all().filter((f) => allowed.has(f.key));

@@ -12,6 +12,8 @@ export interface Fact {
   unit: "pct" | "bp" | "usd" | "level" | "days" | "count" | "text" | "time";
   source: string;
   asOf: string; // ISO
+  /** the connector this value came from, so a figure can be traced back to a feed run */
+  feedKey?: string;
   /** plain-words descriptor for a writer (direction, size). Never contains digits. Not stored. */
   hint?: string;
 }

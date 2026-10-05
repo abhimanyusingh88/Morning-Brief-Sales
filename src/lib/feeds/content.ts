@@ -78,8 +78,32 @@ export const FED_SPEAKERS = ["Governor Ashby", "Governor Okonkwo", "Vice Chair M
 export const FED_TOPICS = ["rates policy", "the economic outlook", "inflation dynamics", "financial stability", "the labor market"];
 
 export const INDEX_EVENTS = [
-  { index: "US Small Cap Index", kind: "quarterly reconstitution", note: "Watch for elevated volume in additions and deletions." },
-  { index: "US Large Cap Index", kind: "quarterly rebalance", note: "Float and share-count changes take effect after the close." },
-  { index: "US Tech Growth Index", kind: "annual reconstitution", note: "Constituent weights reset; index-tracking flows expected into the close." },
-  { index: "US Blue Chip Index", kind: "component review", note: "Committee announcement expected after the close." },
+  { index: "Russell 2000", kind: "quarterly reconstitution", note: "Watch for elevated volume in additions and deletions." },
+  { index: "S&P 500", kind: "quarterly rebalance", note: "Float and share-count changes take effect after the close." },
+  { index: "Nasdaq 100", kind: "annual reconstitution", note: "Constituent weights reset; index-tracking flows expected into the close." },
+  { index: "Dow", kind: "component review", note: "Committee announcement expected after the close." },
 ];
+
+/** Stage-two classifier for headlines the aggregator delivered without tags: ordered keyword rules, first match wins. */
+const EQP = ["Equities", "Options", "Equity swaps"];
+const RULES: { re: RegExp; sector: string | null; products: string[]; tags: string[] }[] = [
+  { re: /chip|semiconductor|supply-chain/i, sector: "Semiconductors", products: EQP, tags: ["supply_chain"] },
+  { re: /software|cloud|hardware|technology/i, sector: "Technology", products: EQP, tags: ["technology"] },
+  { re: /managed-care|biotech|pharma|trial/i, sector: "Healthcare", products: EQP, tags: ["healthcare"] },
+  { re: /\boil\b|crude|refiner|pipeline/i, sector: "Energy", products: ["Commodities", "Futures", ...EQP], tags: ["crude"] },
+  { re: /reit|landlord|office trust|occupancy|refinanc/i, sector: "Real estate", products: EQP, tags: ["real_estate"] },
+  { re: /bank|asset manager|insurer|curve/i, sector: "Financials", products: EQP, tags: ["financials"] },
+  { re: /retailer|auto makers|holiday/i, sector: "Consumer Discretionary", products: EQP, tags: ["consumer"] },
+  { re: /staples|defensives/i, sector: "Consumer Staples", products: EQP, tags: ["defensives"] },
+  { re: /aerospace|rail|machinery/i, sector: "Industrials", products: EQP, tags: ["industrials"] },
+  { re: /treasury|credit|issuance/i, sector: null, products: ["Fixed income", "Futures"], tags: ["rates"] },
+  { re: /dollar/i, sector: null, products: ["FX"], tags: ["dollar"] },
+  { re: /gold/i, sector: null, products: ["Commodities", "Futures"], tags: ["metals"] },
+  { re: /new issue|vehicle|merger vote/i, sector: null, products: ["SPACs / new issues / IPOs", "Equities"], tags: ["ipo"] },
+  { re: /borrow/i, sector: null, products: ["Securities lending / stock loan", "Equities"], tags: ["borrow"] },
+  { re: /leveraged/i, sector: null, products: ["Levered ETFs", "Equities"], tags: ["etf_flows"] },
+];
+export function classifyHeadline(title: string): { sector: string | null; products: string[]; tags: string[]; rule: string } | null {
+  for (const r of RULES) if (r.re.test(title)) return { sector: r.sector, products: r.products, tags: r.tags, rule: r.re.source.split("|")[0] };
+  return null;
+}
