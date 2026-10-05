@@ -1,5 +1,5 @@
 import type { Db, Q } from "../db/types";
-import { llmConfigured } from "../ai/gateway";
+import { llmConfigured, modelName } from "../ai/gateway";
 import { writeBrief, writeCard, type WriteRecord } from "../ai/llm-writer";
 import { prepareProfile, type Prepared } from "../ai/prepare";
 import { templateBrief, templateCard, type BriefText, type CardText } from "../ai/templates";
@@ -91,7 +91,9 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
     void persist(s);
     publish(runId, { type: "step", runId, step: structuredClone(s) });
     const t0 = Date.now();
-    const log = (line: string) => { s.log.push(line); void persist(s); publish(runId, { type: "log", runId, key, line, at: new Date().toISOString() }); };
+    const tag = `[pipeline ${runId.slice(0, 8)}]`;
+    console.log(`${tag} ▶ ${s.label}`);
+    const log = (line: string) => { s.log.push(line); void persist(s); console.log(`${tag}   ${line}`); publish(runId, { type: "log", runId, key, line, at: new Date().toISOString() }); };
     const set = (p: Partial<Pick<StepState, "rowsIn" | "rowsOut" | "detail">>) => Object.assign(s, p);
     try {
       const r = await fn(log, set);
@@ -101,6 +103,7 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
       s.status = "succeeded";
       s.finishedAt = new Date().toISOString();
       s.detail = { ...s.detail, ms: realMs };
+      console.log(`${tag} ✓ ${s.label} (${(realMs / 1000).toFixed(1)}s)`);
       await persist(s);
       publish(runId, { type: "step", runId, step: structuredClone(s) });
       return r;
@@ -208,10 +211,17 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
     const outs: ProfileOut[] = prepared.map((prep) => ({ prep, cards: [], brief: templateBrief(prep.brief), briefGen: {}, briefRecord: null }));
 
     await step("generate_brief", async (log, set) => {
+      let briefsDone = 0;
+      let reportedFailure = false;
+      if (useLlm) log(`Calling ${modelName()} for ${outs.length} briefs (5 at a time)`);
       await pool(outs, 5, async (po) => {
         if (!useLlm) { po.briefGen = { headline: "template" }; return; }
         const r = await writeBrief(po.prep);
         po.brief = r.text; po.briefGen = r.generators; po.briefRecord = r.record;
+        briefsDone += 1;
+        log(`Brief ${briefsDone}/${outs.length} ${r.record.status} · ${((r.record.latencyMs ?? 0) / 1000).toFixed(1)}s · ${(r.record.completionTokens ?? 0).toLocaleString()} tokens out`);
+        const err = r.record.validation?.error;
+        if (err && !reportedFailure) { reportedFailure = true; log(`Model call failed, template used instead: ${String(err).slice(0, 200)}`); }
       });
       const recs = outs.map((x) => x.briefRecord).filter((x): x is WriteRecord => Boolean(x));
       log(useLlm ? `${recs.length} briefs drafted by the model; ${recs.filter((r) => r.status === "accepted").length} accepted first time` : "Template writer used (no model configured)");
@@ -220,9 +230,16 @@ export async function runPipeline(o: RunOptions): Promise<{ runId: string; statu
 
     await step("generate_cards", async (log, set) => {
       const jobs = outs.flatMap((po) => po.prep.cards.map((ctx) => ({ po, ctx })));
+      let cardsDone = 0;
+      let reportedFailure = false;
+      if (useLlm) log(`Calling ${modelName()} for ${jobs.length} call cards (6 at a time)`);
       const done = await pool(jobs, 6, async ({ po, ctx }) => {
         if (!useLlm) return { po, out: { ctx, text: templateCard(ctx), generator: "template", record: null } as CardOut };
         const r = await writeCard(ctx, po.prep);
+        cardsDone += 1;
+        log(`Card ${cardsDone}/${jobs.length} · ${ctx.clientName} · ${r.record.status} · ${((r.record.latencyMs ?? 0) / 1000).toFixed(1)}s`);
+        const err = r.record.validation?.error;
+        if (err && !reportedFailure) { reportedFailure = true; log(`Model call failed, template used instead: ${String(err).slice(0, 200)}`); }
         return { po, out: { ctx, text: r.text, generator: r.generator, record: r.record } as CardOut };
       });
       for (const d of done) d.po.cards.push(d.out);
