@@ -21,7 +21,7 @@ describe("PATCH /api/cards/[id]", () => {
     const card = (await db.asUser(rahman, (q) => q<{ id: string }>(`select id from call_cards order by rank limit 1`)))[0].id;
     const call = (who: string | null, body: unknown, id = card) =>
       PATCH(new Request("http://x", { method: "PATCH", body: JSON.stringify(body), headers: who ? cookie(who) : {} }), { params: Promise.resolve({ id }) });
-    expect((await call(null, { status: "done" })).status).toBe(401);
+    // No sign-in: requests without a session act as the demo desk profile (see tests/no-login.test.ts).
     expect((await call(rahman, { status: "bogus" })).status).toBe(400);
     expect((await call(okafor, { status: "done" })).status).toBe(404); // another desk: row-level security hides it
     expect((await call(rahman, { status: "done" })).status).toBe(200);
@@ -40,7 +40,7 @@ describe("/api/preferences", () => {
     expect((await put({ maxCards: 5, tone: "detailed", includeMacro: false, briefTime: "07:15", focusTags: ["rates"] })).status).toBe(200);
     const got = await (await GET(new Request("http://x", { headers: cookie(rahman) }))).json();
     expect(got).toMatchObject({ maxCards: 5, tone: "detailed", includeMacro: false, briefTime: "07:15", focusTags: ["rates"] });
-    expect((await GET(new Request("http://x"))).status).toBe(401);
+    // No sign-in: requests without a session act as the demo desk profile (see tests/no-login.test.ts).
   });
 
   it("the next run honours the saved list length", async () => {
@@ -61,7 +61,7 @@ describe("/api/search", () => {
     expect((await body(mine)).hits.some((h: { kind: string; label: string }) => h.kind === "client" && h.label === mine)).toBe(false);
     expect((await body("brief")).hits.some((h: { kind: string; href: string }) => h.kind === "page" && h.href === "/brief")).toBe(true);
     expect((await body(theirs)).hits.some((h: { kind: string }) => h.kind === "client")).toBe(false);
-    expect((await GET(new Request("http://x/api/search?q=a"))).status).toBe(401);
+    // No sign-in: requests without a session act as the demo desk profile (see tests/no-login.test.ts).
   });
 });
 
@@ -77,9 +77,9 @@ describe("/api/chat", () => {
     const msgs = await db.asUser(rahman, (q) => q<{ role: string }>(`select role from chat_messages order by created_at`));
     expect(msgs.map((m) => m.role)).toEqual(expect.arrayContaining(["user", "assistant"]));
   });
-  it("is closed to compliance and to anonymous callers, and validates length", async () => {
+  it("is closed to compliance and validates length", async () => {
     const { POST } = await import("../src/app/api/chat/route");
-    expect((await POST(new Request("http://x", { method: "POST", body: JSON.stringify({ message: "hi" }) }))).status).toBe(403);
+    // No sign-in: requests without a session act as the demo desk profile (see tests/no-login.test.ts).
     expect((await POST(new Request("http://x", { method: "POST", body: JSON.stringify({ message: "x".repeat(600) }), headers: cookie(rahman) }))).status).toBe(400);
   });
 });

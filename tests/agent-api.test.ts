@@ -48,8 +48,9 @@ beforeAll(async () => {
 }, 120_000);
 
 describe("access", () => {
-  it("answers 403 to anonymous callers and to roles without the agent", async () => {
-    for (const who of [null, overton, whitaker]) {
+  it("answers 403 to roles without the agent", async () => {
+    // No sign-in: requests without a session act as the demo desk profile (see tests/no-login.test.ts).
+    for (const who of [overton, whitaker]) {
       expect((await threads.GET(req(who, "GET", "/api/agent/threads"))).status).toBe(403);
       expect((await threads.POST(req(who, "POST", "/api/agent/threads", {}))).status).toBe(403);
       expect((await thread.GET(req(who, "GET", "/x"), ctx("00000000-0000-0000-0000-000000000000"))).status).toBe(403);

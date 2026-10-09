@@ -3,7 +3,7 @@ export type { Db, Q, Row } from "./types";
 
 const g = globalThis as unknown as { __mbDb?: Promise<Db>; __mbDbVersion?: number };
 // Bump when connection configuration changes: Next hot reload preserves globals.
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 /** One shared handle per server process. */
 export function getDb(): Promise<Db> {

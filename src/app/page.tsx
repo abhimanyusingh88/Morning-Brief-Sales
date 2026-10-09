@@ -4,5 +4,5 @@ import { HOME } from "@/components/shell/nav";
 
 export default async function Home() {
   const me = await getMe();
-  redirect(me ? HOME[me.role] : "/login");
+  redirect(me ? HOME[me.role] : "/brief");
 }

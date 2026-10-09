@@ -15,10 +15,6 @@ beforeAll(async () => {
 }, 60_000);
 
 describe("/api/brief-prefs", () => {
-  it("refuses anonymous callers", async () => {
-    expect((await route.GET(req("GET"))).status).toBe(401);
-    expect((await route.PUT(req("PUT", valid))).status).toBe(401);
-  });
 
   it("starts from the desk default, then saves for the next business day only", async () => {
     const cookie = await as("rahman");

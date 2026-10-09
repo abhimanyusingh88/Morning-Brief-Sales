@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { testDb, pid, installTestDb } from "./helpers/testdb";
+import { pid, installTestDb } from "./helpers/testdb";
 import { signSession, verifySession } from "../src/lib/auth/session";
 
 beforeAll(async () => {
@@ -22,22 +22,10 @@ describe("session cookie", () => {
 });
 
 describe("/api/session", () => {
-  it("lists personas without any secrets", async () => {
-    const { GET } = await import("../src/app/api/session/route");
-    const body = await (await GET()).json();
-    expect(body.personas.length).toBe(16);
-    expect(JSON.stringify(body)).not.toMatch(/email|password|secret/i);
-    expect(body.personas[0].role).toBe("sales");
-  });
-
-  it("signs in a known persona and rejects unknown or malformed ones", async () => {
-    const { POST } = await import("../src/app/api/session/route");
-    const mk = (b: unknown) => new Request("http://x/api/session", { method: "POST", body: JSON.stringify(b) });
-    const ok = await POST(mk({ profileId: await pid("rahman") }));
-    expect(ok.status).toBe(200);
-    expect(ok.headers.get("set-cookie")).toMatch(/mb_session=.+HttpOnly/i);
-    expect((await POST(mk({ profileId: "00000000-0000-0000-0000-000000000000" }))).status).toBe(404);
-    expect((await POST(mk({ profileId: "nope" }))).status).toBe(400);
+  it("reports that no sign-in is required and refuses sign-in attempts", async () => {
+    const { GET, POST } = await import("../src/app/api/session/route");
+    expect(await (await GET()).json()).toEqual({ demo: true, signInRequired: false });
+    expect((await POST()).status).toBe(410);
   });
 });
 
@@ -70,17 +58,5 @@ describe("/api/health", () => {
     expect(body.database.ok).toBe(true);
     expect(body.ai.configured).toBe(false);
     expect(body.market.simulated).toBe(false);
-  });
-});
-
-describe("every persona can sign in", () => {
-  it("accepts all seeded profile ids (they are deterministic, not RFC-versioned UUIDs)", async () => {
-    const db = await testDb();
-    const { POST } = await import("../src/app/api/session/route");
-    const ids = await db.asService((q) => q<{ id: string }>(`select id from profiles`));
-    for (const { id } of ids) {
-      const r = await POST(new Request("http://x/api/session", { method: "POST", body: JSON.stringify({ profileId: id }) }));
-      expect(r.status, id).toBe(200);
-    }
   });
 });

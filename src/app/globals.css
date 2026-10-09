@@ -2,9 +2,9 @@
 @source "../";
 
 @theme inline {
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Inter Tight Variable", "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-serif: var(--font-sans);
+  --font-serif: "Source Serif 4 Variable", Georgia, "Times New Roman", serif;
 
   --color-bg: #f5f7fa;
   --color-surface: #ffffff;
@@ -151,3 +151,19 @@ body {
 html:has(.app-shell), body:has(.app-shell) { height: 100%; overflow: hidden; overscroll-behavior: none; }
 .app-shell { position: fixed; inset: 0; width: 100%; height: 100dvh; min-height: 0; }
 .app-main { min-height: 0; overscroll-behavior-y: contain; }
+
+/* Right-hand assistant drawer: slides in from the right, out on close (Radix keeps it mounted for the exit). */
+@keyframes drawer-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes drawer-out { from { transform: translateX(0); } to { transform: translateX(100%); } }
+.drawer[data-state="open"] { animation: drawer-in 0.38s cubic-bezier(0.22, 1, 0.36, 1); }
+.drawer[data-state="closed"] { animation: drawer-out 0.26s cubic-bezier(0.4, 0, 1, 1); }
+@media (prefers-reduced-motion: reduce) { .drawer[data-state] { animation: none; } }
+
+/* Assistant "Thinking": a soft light sweep across the label, and a faded top edge on the live reasoning. */
+@keyframes thinking-sweep { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.thinking-text { background: linear-gradient(90deg, var(--color-muted) 0%, var(--color-ink) 45%, var(--color-muted) 90%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: thinking-sweep 2.2s linear infinite; }
+.thinking-fade { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 28px); mask-image: linear-gradient(to bottom, transparent 0, #000 28px); }
+@media (prefers-reduced-motion: reduce) { .thinking-text { animation: none; color: var(--color-ink); background: none; } }
+
+/* Smooth in-page navigation (section links, reader and chat panes); disabled for reduced motion above. */
+html, main, [role="log"], .overflow-y-auto { scroll-behavior: smooth; }

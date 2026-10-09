@@ -16,11 +16,14 @@
     "clients:import": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/import-clients.ts",
     "live:refresh": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/live-refresh.ts",
     "schedule:setup": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/setup-schedule.ts",
-    "demo:check": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/demo-check.ts"
+    "demo:check": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/demo-check.ts",
+    "brief:email": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/send-brief.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/inter-tight": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@fontsource-variable/source-serif-4": "^5.3.0",
     "@fontsource/instrument-serif": "^5.3.0",
     "@radix-ui/react-dialog": "^1.1.23",
     "@radix-ui/react-dropdown-menu": "^2.1.24",

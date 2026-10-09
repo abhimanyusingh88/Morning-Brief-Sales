@@ -14,7 +14,8 @@ describe("seeded world", () => {
       (select count(*)::int from clients) clients, (select count(*)::int from profiles where role='sales') reps,
       (select count(*)::int from instruments) instruments, (select count(*)::int from positions) positions,
       (select count(*)::int from market_quotes) quotes`));
-    expect(r[0].reps).toBe(12);
+    // Includes the two pilot desk profiles created by the live demonstration book (migration 0013).
+    expect(r[0].reps).toBe(14);
     expect(r[0].clients).toBeGreaterThan(200);
     expect(r[0].positions).toBeGreaterThan(1200);
     expect(r[0].quotes).toBe(r[0].instruments);

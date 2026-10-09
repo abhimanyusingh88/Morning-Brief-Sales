@@ -38,7 +38,7 @@ export function discoveryUrls(output:unknown[]):string[]{
 }
 export async function collectNews(universe:string[],signal:AbortSignal,now=new Date(),allowDiscovery:boolean|(()=>Promise<boolean>)=true):Promise<NewsResult>{
  const feeds=await collectPublisherFeeds(universe,signal,now);
- if(!allowDiscovery||!process.env.OPENAI_API_KEY||feeds.articles.length>=8)return {articles:feeds.articles,ok:feeds.successful>0,detail:feeds.successful?'Publisher feeds '+feeds.successful+'/'+feeds.total+' checked; '+feeds.articles.length+' current-day relevant articles.':'PUBLISHER_FEEDS_UNAVAILABLE'};
+ if(!allowDiscovery||!process.env.OPENAI_API_KEY||feeds.articles.length>=60)return {articles:feeds.articles,ok:feeds.successful>0,detail:feeds.successful?'Publisher feeds '+feeds.successful+'/'+feeds.total+' checked; '+feeds.articles.length+' current-day relevant articles.':'PUBLISHER_FEEDS_UNAVAILABLE'};
  const articles=[...feeds.articles];
  if(typeof allowDiscovery==='function'&&!await allowDiscovery())return {articles,ok:feeds.successful>0,detail:'Publisher feeds checked; discovery budget unavailable.'};
  try{

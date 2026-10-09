@@ -18,13 +18,13 @@ PowerShell:
 
 The import is idempotent and preserves original workbook values. It maps three clients and five holdings to two salespeople. Currency, valuation date and financial field units are not inferred; imported values do not become calculated exposure or P&L.
 
-Local sign-in offers active imported salespeople. Production requires configured Supabase authentication with mapped user identities or a private pilot access code of at least sixteen characters. Production never exposes an open persona picker.
+The public demo has no login screen. All visitors see one fixed demo salesperson profile, scoped through database row-level security; the imported sample book is available to anyone with the demo URL. There is no persona picker or password prompt. Do not load confidential customer data into this public demo.
 
 ## News, reading and summaries
 
 Collection checks nineteen original publisher feeds covering business, technology, finance, energy, the economy, investing, earnings, politics and relevant world regions. Admission requires a trusted publisher, an explicitly zoned publication date within the current US day, a safe original URL and a material company or market topic. Sponsored, future-dated and clearly unrelated items are excluded. Similar event headlines are grouped with additional source attribution.
 
-Client selection changes the authorized book first. Stock filters also narrow the holdings shown in news effects. Effects show conditional business or market channels and supporting evidence to check; they do not assert a verified price reaction or calculate returns. There is no automatic sending or trading.
+Client selection changes the authorized book first. Stock filters also narrow the holdings shown in news effects. Effects generate article-specific AI analysis for the selected client and matched holdings. They separate reported evidence, conditional business or market channels, uncertainty and specific evidence to watch; they do not assert a verified price reaction or calculate returns. The analysis is cached privately by source evidence, client book and stock selection. Generic topic templates are not displayed when AI fails. There is no automatic sending or trading.
 
 Headlines open an accessible dashboard modal. Original article text is displayed only for sources with confirmed full-text redistribution rights configured in NEWS_FULL_TEXT_HOSTS. Configuration is an assertion of existing rights, not a license. These sources must also pass the independent network allowlist, original-document date checks and supported article-body extraction. Complete supported text is not silently clipped to a short briefing. An unavailable or unsupported source remains clearly labeled as an excerpt. Previously cached expanded briefings are preserved and explicitly distinguished from complete original reporting.
 

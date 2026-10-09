@@ -57,9 +57,11 @@ export async function importBook(db:Db,data:ImportData,filename:string):Promise<
   }
   // Archive old demo identities reversibly. No existing client or history table is deleted.
   await q('update profiles set is_active=false where id<>all($1::uuid[])',[PILOT_PEOPLE.map(p=>uid('live:'+p.key))]);
-  await q('update live_clients set active=false');
-  await q('update live_accounts set active=false');
-  await q('update live_holdings set active=false');
+  // The demonstration book is kept; only records from earlier workbook imports are archived.
+  const demo="(select id from live_imports where file_hash='demo-book-v1')";
+  await q('update live_holdings set active=false where import_id not in '+demo);
+  await q('update live_accounts set active=false where import_id not in '+demo);
+  await q('update live_clients set active=false where not exists(select 1 from live_accounts a where a.client_id=live_clients.id and a.import_id in '+demo+')');
   const managers=[...new Set(data.rows.map(r=>r.manager))].sort();
   for(let i=0;i<managers.length;i++) {
    const manager=managers[i], id=uid('live:client:'+manager);

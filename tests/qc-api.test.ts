@@ -32,8 +32,8 @@ beforeAll(async () => {
 }, 180_000);
 
 describe("/api/qc/[briefId] access", () => {
-  it("refuses anonymous callers and salespeople", async () => {
-    expect((await route.POST(post(published, { action: "hold" }), ctx(published))).status).toBe(401);
+  it("refuses salespeople, including the default demo profile", async () => {
+    expect((await route.POST(post(published, { action: "hold" }), ctx(published))).status).toBe(403);
     expect((await route.POST(post(published, { action: "hold" }, await as("rahman")), ctx(published))).status).toBe(403);
     expect((await route.GET(get(published, await as("okafor")), ctx(published))).status).toBe(403);
     // and nothing changed
