@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { testDb, pid, installTestDb } from "./helpers/testdb";
+import { pid, installTestDb } from "./helpers/testdb";
 import { signSession } from "../src/lib/auth/session";
 
 const req = (method: string, body?: unknown, cookie?: string) =>

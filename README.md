@@ -1,63 +1,75 @@
 # Morning Brief
 
-A per-salesperson AI desk agent for a trading firm. Each morning it ranks **who to call**, explains **why now**, and drafts **what to say** — using only that salesperson's own book. This repo is the proof-of-concept build: a real pipeline, a real Postgres database with row-level security, and **synthetic** firm data (the app says so in the sidebar).
+A private market-intelligence workspace for salespeople. Current US-day publisher reporting is matched to database-backed client holdings, with client, stock, topic and search filters, in-dashboard reading, potential-effects analysis, a floating assistant and version-bound PDF exports.
 
-> Models write prose containing `{{fact_id}}` tokens; code substitutes the numbers. A validator rejects any digit outside a token. The agent drafts — a human sends. See `CLAUDE.md` for the engineering rules.
+Live screens use the supplied anonymized workbook and verified public evidence. They do not use the legacy simulator. Today, call-list and operations workflows are retired.
 
-## Run it locally
+## Local use
 
-Requires Node 22+.
+Requires Node 22+. Set server configuration in .env or .env.local; see .env.example. Do not print or share the contents of those files.
 
-```bash
-npm install
-cp .env.example .env.local     # then fill in the values below
-npm run dev                    # http://localhost:3000
-```
+PowerShell:
 
-Pick a persona on the login screen (sales, desk head, compliance, admin). Try **Aisha Rahman** first.
+    npm install
+    npm run clients:import -- "C:\Users\Mridul\Downloads\Sample Data.xlsx"
+    npm run live:refresh -- --feeds-only
+    npm run live:refresh -- --market-only
+    npm run dev
 
-### Environment variables (`.env.local`)
+The import is idempotent and preserves original workbook values. It maps three clients and five holdings to two salespeople. Currency, valuation date and financial field units are not inferred; imported values do not become calculated exposure or P&L.
 
-| Variable | Needed? | Notes |
-|---|---|---|
-| `DATABASE_URL` | for Supabase | Supabase → Connect → **Transaction pooler** string, with the DB password. Leave empty to use the embedded database in `.data/`. |
-| `OPENAI_API_KEY` | optional | Empty → the built-in template writer is used. Set → an LLM writes the prose, every output is validated, and any field that fails falls back to the template. |
-| `OPENAI_MODEL` | optional | Default `gpt-6-luna`. Check **Pipeline → health** (or `/api/health`) to confirm the key can see the model. |
-| `SESSION_SECRET` | yes for non-dev | 32+ random chars, e.g. `openssl rand -hex 32`. |
-| `DEMO_CONTROL_PIN` | optional | 6-digit PIN for the admin Demo control page. |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | optional | Not required by the current screens. |
+Local sign-in offers active imported salespeople. Production requires configured Supabase authentication with mapped user identities or a private pilot access code of at least sixteen characters. Production never exposes an open persona picker.
 
-With **no** variables at all the app still runs end to end: it boots an embedded Postgres, seeds the synthetic firm, and runs the pipeline on first load.
+## News, reading and summaries
 
-### Against Supabase
+Collection checks nineteen original publisher feeds covering business, technology, finance, energy, the economy, investing, earnings, politics and relevant world regions. Admission requires a trusted publisher, an explicitly zoned publication date within the current US day, a safe original URL and a material company or market topic. Sponsored, future-dated and clearly unrelated items are excluded. Similar event headlines are grouped with additional source attribution.
 
-Migrations are applied automatically (in order, under an advisory lock) when the app starts against Supabase; the synthetic world is seeded once and re-seeded when its version changes. With `DATABASE_URL` set:
+Client selection changes the authorized book first. Stock filters also narrow the holdings shown in news effects. Effects show conditional business or market channels and supporting evidence to check; they do not assert a verified price reaction or calculate returns. There is no automatic sending or trading.
 
-```bash
-npm run brief        # run the morning pipeline against that database
-npm run dev
-```
+Headlines open an accessible dashboard modal. Original article text is displayed only for sources with confirmed full-text redistribution rights configured in NEWS_FULL_TEXT_HOSTS. Configuration is an assertion of existing rights, not a license. These sources must also pass the independent network allowlist, original-document date checks and supported article-body extraction. Complete supported text is not silently clipped to a short briefing. An unavailable or unsupported source remains clearly labeled as an excerpt. Previously cached expanded briefings are preserved and explicitly distinguished from complete original reporting.
 
-### Commands
+Summarize opens a labeled bullet-point panel above the reading content. It covers the text available in that reader, with main developments, material facts, timing, context, reported implications and caveats. An excerpt cannot support a complete-article summary and the UI says so. Summary generation is on demand, validated and shared in a source/evidence cache; opening an article does not make an AI call. A summary is an aid to reading, not a guarantee that no detail can be missed.
 
-`npm run typecheck` · `npm run lint` · `npm test` · `npm run db:local` · `npm run db:reset` · `npm run brief` · `npm run dev`
+Full original publisher articles remain a rollout dependency: connect an authorized full-text source. Public availability of a website or RSS feed is insufficient permission to redistribute its complete articles in a commercial product. A licensed provider API may require its own adapter; the existing full-text reader supports authorized original HTML.
 
-## The screens
+## Market freshness
 
-| Who | Screen | What it shows |
-|---|---|---|
-| Salesperson | Today, Morning brief, Call list, Clients | The ranked calls, the spec-style brief (snapshot, S&P 500 chart, Catalysts, sections), client 360 |
-| Salesperson | Agent | Chat with threads and history; step trace, sources behind every figure, drafts you copy or open in your own mail app (never sent) |
-| Salesperson | Brief setup | Sectors, products, what to include, delivery and send time; applies from the next business day |
-| Desk head, admin, compliance | Morning run | The whole morning in time-lapse (about 90 s): live simulated ET clock, 5 stages and 17 steps, feed map, logs, outage / QC-hold / model controls, results, history |
-| Operations | Data feeds | 14 simulated connectors: health against SLA, rows, latency, payload sample, dependent sections, what the firm provides to go live |
-| Operations | QC review | 8 automated checks per brief plus a simulated spot-check; hold or release a brief |
-| Operations | Deliveries | Dashboard and email-digest deliveries with an isolated email preview; held briefs |
+Every snapshot retains its observation date and source link. Cash-index quotes before the regular US session can legitimately be the previous close. Treasury par yields and the configured Cboe VIX source are daily observations; they are not live intraday feeds. Commodity futures are delayed public quotes and retain their own observation times. Fetch time never replaces observation time.
 
-Salespeople never see the operations screens in real life; the demo shows them so the whole pipeline is transparent. See `docs/DEMO.md` for a 2-minute walkthrough.
+If a source fails, the last verified value is retained with its real date. There is no synthetic replacement.
 
-## What is simulated
+## Background execution and deployment
 
-Prices, earnings dates, the macro calendar and every headline are **placeholders** from a market simulator (headlines are flagged `simulated`). Briefs are stamped 06:30 ET on the business date (`DEMO_BUSINESS_DATE` overrides it). A live market-data adapter is required before showing this as real.
+Recurring work uses QStash HTTP delivery and a durable Postgres queue, not an in-process node-cron loop. Jobs have unique scheduling keys, leases, bounded concurrency, retry backoff and stale-lease recovery. Market/public-feed scheduling uses five-minute slots. AI discovery is eligible on a separate interval, only if feed coverage is sparse, and under a daily call cap. Model discovery receives public security names only, never client positions.
 
-Also placeholders: company names are fictional and may collide with real ones; index labels (S&P 500, Nasdaq 100, Russell 2000, Dow) are applied to synthetic data; the email relay is simulated and nothing is ever sent to a client; Fed dates and speakers are invented. With no model key configured the template writer produces all prose; with one, results are cached (`llm_cache`) so a rerun is instant.
+Set APP_URL to the actual deployed HTTPS origin, configure both QStash signing keys, then run:
+
+    npm run schedule:setup
+
+Until that command succeeds for a deployed origin, production autonomous refreshing is not active. A local one-shot refresh is not a scheduler. Vercel Hobby's daily cron cannot provide this cadence, and commercial hosting needs an eligible plan.
+
+## Assistant and privacy
+
+The floating assistant uses the selected report, client and news filters. Simple holdings and briefing requests use deterministic source-backed answers. Complex requests may use OpenAI under a per-person usage cap; failures return an honest source-backed fallback. No paid model probes run through the health check.
+
+Every private-data read uses row-level security. Reports, chat, search, article detail and PDF export recheck ownership and current coverage. Report evidence changes and revoked client assignments invalidate old authorized views.
+
+Models write numerical fact tokens. Code substitutes original expressions only after validation; model-generated unsupported figures are rejected.
+
+## Commands and verification
+
+    npm run typecheck
+    npm run lint
+    npm test
+    npm run build
+    npm run demo:check
+
+Useful bounded refresh modes:
+
+    npm run live:refresh -- --publish-only
+    npm run live:refresh -- --feeds-only
+    npm run live:refresh -- --market-only
+
+These three modes make no OpenAI calls. Tests use fixtures and do not spend paid model tokens. PDF exports use the selected immutable report and the same client/news filters; they contain report content, not separately opened article-reader content or chat conversations.
+
+Legacy simulator code remains for historical regression tests. Do not use legacy pipeline scripts for live product data.

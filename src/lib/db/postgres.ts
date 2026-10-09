@@ -30,8 +30,10 @@ export function openPostgres(url: string, opts: { ssl?: boolean; max?: number } 
   return {
     asUser: (profileId, fn) =>
       sql.begin(async (tx) => {
+        const identities=await tx.unsafe('select auth_user_id from profiles where id=$1 and is_active',[profileId]);
+        const subject=identities[0]?.auth_user_id??profileId;
         await tx.unsafe("set local role authenticated");
-        await tx.unsafe("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: profileId, role: "authenticated" })]);
+        await tx.unsafe("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: subject, role: "authenticated" })]);
         return fn(runner(tx));
       }) as never,
     asService: (fn) => sql.begin(async (tx) => fn(runner(tx))) as never,

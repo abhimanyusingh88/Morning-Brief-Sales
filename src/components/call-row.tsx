@@ -1,4 +1,3 @@
-import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Badge, UrgencyBadge } from "@/components/ui/badge";
 import { RichText, type FactView } from "@/components/ui/fact";

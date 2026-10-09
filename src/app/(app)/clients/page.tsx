@@ -1,57 +1,9 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
-import { Badge, UrgencyBadge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/states";
-import { PageHeader } from "@/components/ui/page-header";
-import { getMe } from "@/lib/auth/session";
-import { listClients } from "@/lib/data/clients";
-import { SEGMENT_LABEL } from "@/lib/format";
-import { formatUsd } from "@/lib/market/format";
-import { cn } from "@/lib/cn";
-
-export const metadata = { title: "Clients" };
-
-export default async function Clients({ searchParams }: { searchParams: Promise<{ q?: string; s?: string }> }) {
-  const me = await getMe();
-  if (!me) redirect("/login");
-  if (me.role !== "sales" && me.role !== "desk_head") redirect("/");
-  const sp = await searchParams;
-  const rows = await listClients(me.id, { q: sp.q, segment: sp.s });
-  const segs = Object.keys(SEGMENT_LABEL);
-  return (
-    <div className="space-y-5">
-      <PageHeader eyebrow="Coverage" title="Clients" description={`${rows.length} clients in your coverage. Find a relationship and view its latest activity.`} />
-      <Card className="overflow-hidden">
-        <form className="flex flex-wrap items-center gap-2 border-b border-line p-3" role="search">
-          <input name="q" defaultValue={sp.q} placeholder="Search by name" aria-label="Search clients" className="h-9 w-full rounded-lg border border-line-strong bg-surface px-3 text-[13px] outline-none focus:border-brand focus:ring-2 focus:ring-brand-100 sm:w-64" />
-          <div className="flex flex-wrap gap-1">
-            <Link href="/clients" className={cn("rounded-md px-2.5 py-1.5 text-[12.5px] font-medium", !sp.s ? "bg-navy text-white" : "text-muted hover:bg-sunken")}>All</Link>
-            {segs.map((s) => <Link key={s} href={`/clients?s=${s}`} className={cn("rounded-md px-2.5 py-1.5 text-[12.5px] font-medium", sp.s === s ? "bg-navy text-white" : "text-muted hover:bg-sunken")}>{SEGMENT_LABEL[s]}</Link>)}
-          </div>
-        </form>
-        {rows.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-[13px]">
-              <thead className="bg-bg text-left text-[12px] text-muted">
-                <tr><th className="px-5 py-2 font-medium">Client</th><th className="px-3 py-2 font-medium">Type</th><th className="px-3 py-2 font-medium">Tier</th><th className="px-3 py-2 text-right font-medium">AUM</th><th className="px-3 py-2 text-right font-medium">Last contact</th><th className="px-5 py-2 font-medium">Today</th></tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {rows.map((r) => (
-                  <tr key={r.id} className="hover:bg-sunken/60">
-                    <td className="px-5 py-2.5"><Link href={`/clients/${r.id}`} className="font-semibold text-ink hover:text-brand-600">{r.name}</Link></td>
-                    <td className="px-3 py-2.5 text-ink-2">{SEGMENT_LABEL[r.segment]}</td>
-                    <td className="px-3 py-2.5"><Badge tone={r.tier === 1 ? "navy" : "outline"}>Tier {r.tier}</Badge></td>
-                    <td className="num px-3 py-2.5 text-right text-ink-2">{formatUsd(r.aumUsdMn * 1e6)}</td>
-                    <td className={cn("num px-3 py-2.5 text-right", (r.lastContactDays ?? 999) > 45 ? "font-medium text-amber" : "text-ink-2")}>{r.lastContactDays == null ? "—" : `${r.lastContactDays} d ago`}</td>
-                    <td className="px-5 py-2.5">{r.cardId && r.cardUrgency ? <Link href={`/calls?card=${r.cardId}`}><UrgencyBadge urgency={r.cardUrgency as "now" | "today" | "this_week"} /></Link> : <span className="text-subtle">—</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <EmptyState title="No clients match" body="Try a different name or clear the filter." />}
-      </Card>
-    </div>
-  );
-}
+import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { getMe } from '@/lib/auth/session';
+import { getDb } from '@/lib/db';
+import { getCoverage } from '@/lib/live/reports';
+import { Card,CardBody,CardHeader } from '@/components/ui/card';
+import { HoldingsTable } from '@/components/live/report-content';
+export const dynamic='force-dynamic';export const metadata={title:'Client coverage'};
+export default async function Page(){const me=await getMe();if(!me)redirect('/login');const book=await getCoverage(await getDb(),me.id);return <div className="space-y-6"><header><p className="eyebrow">Your assigned book</p><h1 className="mt-1 text-3xl font-semibold tracking-tight">Client coverage</h1><p className="mt-2 text-sm text-muted">{book.clients.length} clients · {book.holdings.length} holdings · imported from the supplied client workbook</p></header><div className="grid gap-4 md:grid-cols-3">{book.clients.map(c=><Card key={c.id}><CardBody><h2 className="text-lg font-semibold">{c.name}</h2><p className="mt-2 text-xs text-muted">{c.accounts} fund accounts · {c.holdings} holdings</p><p className="mt-4 font-medium text-brand">{c.symbols.join(' · ')}</p><Link className="mt-5 inline-block text-sm font-medium text-brand underline underline-offset-4" href={'/brief?client='+c.id}>Open client brief →</Link></CardBody></Card>)}</div><Card><CardHeader title="Imported holdings" sub="Original values are preserved; currency and financial units are unspecified"/><HoldingsTable holdings={book.holdings}/></Card></div>}

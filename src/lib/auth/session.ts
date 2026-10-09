@@ -26,7 +26,9 @@ export function signSession(profileId: string, now = Date.now()): string {
 
 export function verifySession(token: string | undefined, now = Date.now()): string | null {
   if (!token) return null;
-  const [payload, sig] = token.split(".");
+  const parts=token.split(".");
+  if(parts.length!==2)return null;
+  const [payload, sig] = parts;
   if (!payload || !sig) return null;
   const want = mac(payload);
   let got: Buffer;
@@ -34,7 +36,7 @@ export function verifySession(token: string | undefined, now = Date.now()): stri
   if (got.length !== want.length || !timingSafeEqual(got, want)) return null;
   try {
     const { p, exp } = JSON.parse(Buffer.from(payload, "base64url").toString()) as { p: string; exp: number };
-    return exp * 1000 > now && typeof p === "string" ? p : null;
+    return exp * 1000 > now && typeof p === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(p) && Number.isFinite(exp) ? p : null;
   } catch { return null; }
 }
 
@@ -57,7 +59,7 @@ export async function loadMe(profileId: string): Promise<Me | null> {
   const db = await getDb();
   const rows = await db.asUser(profileId, (q) => q(
     `select p.id, p.full_name, p.initials, p.title, p.role, p.desk_id, d.name desk_name, p.email, p.avatar_hue
-       from profiles p left join desks d on d.id = p.desk_id where p.id = $1`, [profileId]));
+       from profiles p left join desks d on d.id = p.desk_id where p.id = $1 and p.is_active`, [profileId]));
   const r = rows[0];
   return r ? { id: String(r.id), fullName: String(r.full_name), initials: String(r.initials), title: String(r.title), role: r.role as Role, deskId: (r.desk_id as string) ?? null, deskName: (r.desk_name as string) ?? null, email: String(r.email), hue: Number(r.avatar_hue) } : null;
 }

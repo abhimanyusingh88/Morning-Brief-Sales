@@ -1,8 +1,9 @@
 # Morning Brief — engineering rules
 
-Product: a per-salesperson AI desk agent for a trading firm. Every morning it ranks "who to call",
-explains why now, and drafts what to say, using only that salesperson's own book.
-This repo is the proof-of-concept build: real pipeline, real database, synthetic firm data.
+Product: a per-salesperson market briefing workspace. Current-day verified public events are matched
+against database-backed client holdings, with client filters and version-bound PDF exports.
+Live screens use the anonymised workbook and verified evidence; legacy synthetic engines remain
+only for historical tests. Their HTTP workflows are retired through src/proxy.ts.
 
 ## Non-negotiable rules
 1. **The LLM never produces numbers.** Models write prose containing `{{fact_id}}` tokens. Code
@@ -14,8 +15,9 @@ This repo is the proof-of-concept build: real pipeline, real database, synthetic
 3. **Every value carries source and timestamp** (`market_quotes.source/as_of`, fact `source/as_of`).
 4. **Units are fixed per instrument type.** Stock, sector and commodity moves are percent. Yields and credit spreads are basis points. Equity *index* moves in the markets snapshot are basis points, as the Build Specification (3.1) and the sample brief show; VIX is level plus percent. Never mix units within an instrument type.
 5. **The agent drafts; the human sends.** No code path sends anything to a client.
-6. **No real publisher names, no Bloomberg marks, no real people.** Simulated headlines are marked
-   `simulated = true` and carry a generic source label.
+6. **Live data must come from original, timestamped evidence.** Attribute real public publishers.
+   Never serve synthetic fallback through live screens. Sourced titles/excerpts can contain quoted
+   figures; model-written prose must still pass the numerical validator.
 7. Secrets only in env vars. Never commit `.env*` (except `.env.example`). Never log keys.
 
 ## Layout

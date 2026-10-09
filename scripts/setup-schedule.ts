@@ -1,0 +1,3 @@
+import { appOrigin,scheduler } from '../src/lib/live/delivery';
+async function main(){const origin=appOrigin();if(!origin)throw new Error('Set APP_URL to the production HTTPS origin');if(!process.env.QSTASH_CURRENT_SIGNING_KEY||!process.env.QSTASH_NEXT_SIGNING_KEY)throw new Error('QStash signing keys are required');const client=scheduler();await client.schedules.create({destination:origin+'/api/live/work',scheduleId:'morning-brief-refresh',cron:'CRON_TZ=America/New_York */5 * * * *',retries:2,body:'{}',headers:{'Content-Type':'application/json'}});console.log('Configured one idempotent five-minute refresh schedule.');}
+main().catch(()=>{console.error('Schedule setup failed. Check APP_URL and QStash credentials.');process.exitCode=1;});

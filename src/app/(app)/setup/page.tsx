@@ -1,21 +1,3 @@
-import { redirect } from "next/navigation";
-import { PageHeader } from "@/components/ui/page-header";
-import { getMe } from "@/lib/auth/session";
-import { getDb } from "@/lib/db";
-import { getPrefsView } from "@/lib/brief/prefs";
-import { SetupForm } from "./setup-form";
-
-export const metadata = { title: "Brief setup" };
-export const dynamic = "force-dynamic";
-
-export default async function Setup() {
-  const me = await getMe();
-  if (!me) redirect("/login");
-  const view = await getPrefsView(await getDb(), me.id);
-  return (
-    <div className="mx-auto max-w-[760px] space-y-6">
-      <PageHeader eyebrow="Account" title="Brief setup" description="Choose your sectors, products and sections. Saved changes apply from the next business day's brief; today's brief is never regenerated." />
-      <SetupForm initial={view.current} pending={view.pending} businessDate={view.businessDate} isDefault={view.isDefault} />
-    </div>
-  );
-}
+import { redirect } from 'next/navigation';import { getMe } from '@/lib/auth/session';import { getDb } from '@/lib/db';import { getPreferences } from '@/lib/live/reports';import { Interests } from '@/components/live/interests';
+export const dynamic='force-dynamic';export const metadata={title:'My interests'};
+export default async function Page(){const me=await getMe();if(!me)redirect('/login');const prefs=await getPreferences(await getDb(),me.id);return <div className="max-w-4xl space-y-6"><header><p className="eyebrow">Personalise your coverage</p><h1 className="mt-1 text-3xl font-semibold">My interests</h1><p className="mt-2 text-sm text-muted">News is matched to your assigned client holdings and the topics you cover.</p></header><Interests prefs={prefs}/></div>}

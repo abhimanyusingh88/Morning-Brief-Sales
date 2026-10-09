@@ -1,6 +1,7 @@
 "use client";
+
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, Copy, Loader2, MessageSquareText, SendHorizontal, Sparkles, X } from "lucide-react";
+import { Bot, Check, Copy, ExternalLink, Loader2, MessageSquareText, Send, ShieldCheck, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
@@ -12,9 +13,23 @@ interface Answer {
   followups: string[];
   draft?: { subject: string; template: string; to: string | null };
 }
-interface Msg { role: "user" | "assistant"; text: string; answer?: Answer; steps?: string[]; pending?: boolean; error?: string }
 
-const STARTERS = ["Who should I call today?", "What moved overnight?", "Which open follow-ups am I behind on?", "Who is exposed to semiconductors?"];
+interface Msg {
+  role: "user" | "assistant";
+  text: string;
+  answer?: Answer;
+  steps?: string[];
+  pending?: boolean;
+  error?: string;
+}
+
+const STARTERS = [
+  "Who should I call first today, and why?",
+  "What moved overnight across my client positions?",
+  "Which open follow-ups or accounts am I behind on?",
+  "Who is exposed to semiconductor and tech moves?",
+];
+
 const Ctx = React.createContext<{ ask: (q?: string) => void }>({ ask: () => {} });
 export const useAsk = () => React.useContext(Ctx);
 
@@ -23,11 +38,11 @@ export function FloatingChatButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      aria-label="Ask Morning Brief AI"
-      title="Ask Morning Brief AI"
-      className="fixed bottom-6 right-6 z-40 flex h-13 w-13 cursor-pointer items-center justify-center rounded-full bg-slate-900 text-white shadow-xl transition-all duration-200 hover:scale-105 hover:bg-slate-800 hover:shadow-2xl active:scale-95 border border-slate-700/60"
+      aria-label="Ask Morning Brief Assistant"
+      title="Ask Morning Brief Assistant"
+      className="fixed bottom-5 right-5 z-40 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-slate-900 text-white shadow-lg transition-all hover:bg-slate-800 border border-slate-700"
     >
-      <MessageSquareText size={22} className="text-cyan" />
+      <MessageSquareText size={20} />
     </button>
   );
 }
@@ -47,8 +62,8 @@ export function AskProvider({ children }: { children: React.ReactNode }) {
 export function AskButton() {
   const { ask } = useAsk();
   return (
-    <Button variant="dark" size="sm" onClick={() => ask()} aria-label="Ask Morning Brief">
-      <Sparkles size={14} className="text-cyan" /> Ask
+    <Button variant="dark" size="sm" onClick={() => ask()} aria-label="Ask Morning Brief" className="bg-slate-900 hover:bg-slate-800 text-white text-[12px] font-medium gap-1.5 border border-slate-700">
+      <MessageSquareText size={14} /> Ask Agent
     </Button>
   );
 }
@@ -61,25 +76,59 @@ function Reveal({ text, facts, animate }: { text: string; facts: Record<string, 
     const t = setInterval(() => { i += 6; setN(i); if (i >= text.length) clearInterval(t); }, 14);
     return () => clearInterval(t);
   }, [text, animate]);
-  // Reveal by whole tokens so a figure never appears half-typed.
+
   let cut = Math.min(n, text.length);
   const open = text.lastIndexOf("{{", cut - 1);
   if (open > -1 && text.indexOf("}}", open) >= cut) cut = open;
-  return <div className="whitespace-pre-line text-[13.5px] leading-relaxed text-ink"><RichText template={text.slice(0, cut)} facts={facts} /></div>;
+  return (
+    <div className="whitespace-pre-line font-sans text-[13px] leading-relaxed text-slate-900">
+      <RichText template={text.slice(0, cut)} facts={facts} />
+    </div>
+  );
 }
 
-function DraftCard({ draft, facts }: { draft: NonNullable<Answer["draft"]>; facts: Record<string, FactView> }) {
+function DrawerDraftCard({ draft, facts }: { draft: NonNullable<Answer["draft"]>; facts: Record<string, FactView> }) {
   const [copied, setCopied] = React.useState(false);
   const rendered = draft.template.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => facts[k]?.display ?? "");
+  const mailto = `mailto:?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(rendered.replace(/\n/g, "\r\n"))}`;
+
   return (
-    <div className="mt-3 rounded-lg border border-line bg-bg">
-      <div className="flex items-center justify-between border-b border-line px-3 py-2">
-        <div className="min-w-0"><p className="truncate text-[12px] font-semibold text-ink">{draft.subject}</p><p className="text-[11px] text-muted">{draft.to ? `To: ${draft.to} · ` : ""}Draft only. You send it.</p></div>
-        <Button size="sm" variant="secondary" onClick={() => { void navigator.clipboard?.writeText(`${draft.subject}\n\n${rendered}`); setCopied(true); setTimeout(() => setCopied(false), 1600); }}>
-          {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? "Copied" : "Copy"}
-        </Button>
+    <div className="mt-2.5 rounded border border-slate-200 bg-white overflow-hidden">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 text-white px-3 py-2">
+        <div className="min-w-0">
+          <p className="truncate text-[12.5px] font-bold text-white">{draft.subject}</p>
+          <p className="text-[10.5px] text-slate-400">{draft.to ? `To: ${draft.to} · ` : ""}Draft Only</p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-6.5 px-2 bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-700 text-[10.5px]"
+            onClick={() => {
+              void navigator.clipboard?.writeText(`${draft.subject}\n\n${rendered}`);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1600);
+            }}
+          >
+            {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+            <span>{copied ? "Copied" : "Copy"}</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            asChild
+            className="h-6.5 px-2 bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-700 text-[10.5px]"
+          >
+            <a href={mailto}>
+              <ExternalLink size={11} />
+              <span>Mail</span>
+            </a>
+          </Button>
+        </div>
       </div>
-      <div className="whitespace-pre-line px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-2"><RichText template={draft.template} facts={facts} /></div>
+      <div className="whitespace-pre-line px-3 py-2 text-[12.5px] leading-relaxed text-slate-800 font-sans">
+        <RichText template={draft.template} facts={facts} />
+      </div>
     </div>
   );
 }
@@ -99,7 +148,11 @@ function Drawer({ open, setOpen, initial, onConsumed }: { open: boolean; setOpen
     setMsgs((m) => [...m, { role: "user", text }, { role: "assistant", text: "", steps: [], pending: true }]);
     const patch = (f: (m: Msg) => Msg) => setMsgs((all) => all.map((m, i) => (i === all.length - 1 ? f(m) : m)));
     try {
-      const res = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text, threadId: thread.current }) });
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, threadId: thread.current }),
+      });
       if (!res.ok || !res.body) throw new Error(res.status === 403 ? "Chat is available to salespeople and desk heads." : "The assistant is unavailable.");
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -132,55 +185,154 @@ function Drawer({ open, setOpen, initial, onConsumed }: { open: boolean; setOpen
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-navy/20" />
-        <Dialog.Content aria-describedby={undefined} className="fixed bottom-0 right-0 top-0 z-50 flex w-[min(460px,100vw)] flex-col border-l border-line bg-surface shadow-[var(--shadow-pop)]">
-          <div className="flex h-14 items-center justify-between border-b border-line px-4">
-            <Dialog.Title className="flex items-center gap-2 text-[14px] font-semibold"><span className="flex h-6 w-6 items-center justify-center rounded-md bg-navy text-cyan"><MessageSquareText size={13} /></span> Ask Morning Brief</Dialog.Title>
-            <div className="flex items-center gap-1"><Button variant="ghost" size="sm" onClick={() => { setOpen(false); router.push(thread.current ? `/agent?t=${thread.current}` : "/agent"); }}>Open in Agent</Button><Dialog.Close asChild><Button variant="ghost" size="icon" aria-label="Close"><X size={16} /></Button></Dialog.Close></div>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-xs" />
+        <Dialog.Content aria-describedby={undefined} className="fixed bottom-0 right-0 top-0 z-50 flex w-[min(460px,100vw)] flex-col border-l border-slate-200 bg-white shadow-xl">
+          {/* Header - Clean typography, no chip icon */}
+          <div className="flex h-13 items-center justify-between border-b border-slate-800 bg-slate-900 px-3.5 text-white">
+            <div>
+              <Dialog.Title className="text-[13.5px] font-bold text-white tracking-tight">Morning Brief Assistant</Dialog.Title>
+              <p className="text-[11px] text-slate-400">Sales & Client Intelligence</p>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Button
+                variant="dark"
+                size="sm"
+                className="h-7.5 bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 text-[11.5px]"
+                onClick={() => {
+                  setOpen(false);
+                  router.push(thread.current ? `/agent?t=${thread.current}` : "/agent");
+                }}
+              >
+                <span>Full Workspace</span>
+              </Button>
+              <Dialog.Close asChild>
+                <Button variant="ghost" size="icon" aria-label="Close" className="h-7.5 w-7.5 text-slate-400 hover:text-white hover:bg-slate-800">
+                  <X size={16} />
+                </Button>
+              </Dialog.Close>
+            </div>
           </div>
-          <div className="scroll-thin flex-1 space-y-4 overflow-y-auto px-4 py-4">
+
+          {/* Messages Feed */}
+          <div className="scroll-thin flex-1 space-y-3 overflow-y-auto px-4 py-4 bg-slate-50/40">
             {!msgs.length ? (
-              <div className="pt-6">
-                <p className="text-[15px] font-semibold text-ink">What do you want to know?</p>
-                <p className="mt-1 text-[13px] text-muted">I only see your own clients and book. Every figure I show links back to its source.</p>
-                <div className="mt-4 flex flex-col gap-2">
-                  {STARTERS.map((s) => <button key={s} onClick={() => void send(s)} className="cursor-pointer rounded-lg border border-line bg-surface px-3 py-2.5 text-left text-[13.5px] text-ink-2 hover:border-brand hover:bg-brand-50">{s}</button>)}
+              <div className="pt-2 space-y-3">
+                <div className="space-y-1">
+                  <h3 className="text-[13.5px] font-bold text-slate-900">Sales & Client Intelligence</h3>
+                  <p className="text-[12px] text-slate-600 leading-normal">
+                    Ask about positions, overnight moves, or draft client notes.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Suggested Actions</p>
+                  <div className="flex flex-col gap-1.5">
+                    {STARTERS.map((s, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => void send(s)}
+                        className="cursor-pointer rounded border border-slate-200 bg-white px-3 py-2.5 text-left text-[12.5px] font-medium text-slate-900 transition-colors hover:border-slate-400 hover:bg-slate-50"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : null}
-            {msgs.map((m, i) => m.role === "user" ? (
-              <div key={i} className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-navy px-3.5 py-2 text-[13.5px] text-white">{m.text}</div>
-            ) : (
-              <div key={i} className="rise max-w-[96%]">
-                {m.steps?.length ? (
-                  <ul className="mb-2 space-y-1">
-                    {m.steps.map((s, j) => (
-                      <li key={j} className="flex items-center gap-1.5 text-[12px] text-muted">
-                        {m.pending && j === m.steps!.length - 1 ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} className="text-up" />} {s}
-                      </li>
-                    ))}
-                  </ul>
-                ) : m.pending ? <p className="text-[12px] text-muted">Thinking…</p> : null}
-                {m.error ? <p className="rounded-lg bg-down-50 px-3 py-2 text-[13px] text-down">{m.error}</p> : null}
-                {m.answer ? (
-                  <div className="rounded-2xl rounded-bl-md border border-line bg-surface px-3.5 py-3 shadow-card">
-                    <Reveal text={m.answer.template} facts={m.answer.facts} animate={i === msgs.length - 1} />
-                    {m.answer.draft ? <DraftCard draft={m.answer.draft} facts={m.answer.facts} /> : null}
-                    {i === msgs.length - 1 && !busy ? (
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {m.answer.followups.map((f) => <button key={f} onClick={() => void send(f)} className="cursor-pointer rounded-full border border-line px-2.5 py-1 text-[12px] text-ink-2 hover:border-brand hover:text-brand-600">{f}</button>)}
-                      </div>
-                    ) : null}
+
+            {msgs.map((m, i) =>
+              m.role === "user" ? (
+                <div key={i} className="ml-auto max-w-[85%] space-y-0.5">
+                  <div className="rounded-lg bg-slate-900 px-3.5 py-2.5 text-[12.5px] text-white border border-slate-800">
+                    {m.text}
                   </div>
-                ) : null}
-              </div>
-            ))}
+                </div>
+              ) : (
+                <div key={i} className="max-w-[96%] space-y-1">
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-slate-700">
+                    <span>ASSISTANT</span>
+                  </div>
+
+                  {m.steps?.length ? (
+                    <ul className="mb-1 space-y-0.5 rounded border border-slate-200 bg-slate-100/70 p-2 text-[11px] font-mono text-slate-600">
+                      {m.steps.map((s, j) => (
+                        <li key={j} className="flex items-center gap-1.5">
+                          {m.pending && j === m.steps!.length - 1 ? (
+                            <Loader2 size={11} className="animate-spin text-slate-800" />
+                          ) : (
+                            <Check size={11} className="text-emerald-600" />
+                          )}
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : m.pending ? (
+                    <p className="text-[11px] font-mono text-slate-500 flex items-center gap-1">
+                      <Loader2 size={12} className="animate-spin" /> Querying enterprise feeds…
+                    </p>
+                  ) : null}
+
+                  {m.error ? <p className="rounded bg-red-50 border border-red-200 p-2 text-[12px] text-red-700 font-medium">{m.error}</p> : null}
+
+                  {m.answer ? (
+                    <div className="rounded border border-slate-200 bg-white p-3.5 space-y-2">
+                      <Reveal text={m.answer.template} facts={m.answer.facts} animate={i === msgs.length - 1} />
+                      {m.answer.draft ? <DrawerDraftCard draft={m.answer.draft} facts={m.answer.facts} /> : null}
+
+                      {i === msgs.length - 1 && !busy ? (
+                        <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap gap-1">
+                          {m.answer.followups.map((f) => (
+                            <button
+                              key={f}
+                              onClick={() => void send(f)}
+                              className="cursor-pointer rounded border border-slate-200 bg-slate-50 px-2 py-1 text-[11.5px] font-medium text-slate-800 hover:border-slate-400 hover:bg-slate-100"
+                            >
+                              {f}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            )}
             <div ref={end} />
           </div>
-          <form className="flex items-center gap-2 border-t border-line p-3" onSubmit={(e) => { e.preventDefault(); void send(input); }}>
-            <input value={input} onChange={(e) => setInput(e.target.value)} maxLength={500} placeholder="Ask about your calls, clients or the tape…" className="h-10 min-w-0 flex-1 rounded-lg border border-line-strong bg-surface px-3 text-[14px] outline-none placeholder:text-subtle focus:border-brand focus:ring-2 focus:ring-brand-100" aria-label="Your question" />
-            <Button type="submit" variant="primary" size="icon" disabled={busy || !input.trim()} aria-label="Send" className="h-10 w-10"><SendHorizontal size={16} /></Button>
+
+          {/* Input Form - PERFECT ALIGNMENT */}
+          <form className="flex items-center gap-2 border-t border-slate-200 bg-slate-50 p-3" onSubmit={(e) => { e.preventDefault(); void send(input); }}>
+            <div className="min-w-0 flex-1">
+              <label htmlFor="chat-drawer-input" className="sr-only">Your question</label>
+              <textarea
+                id="chat-drawer-input"
+                rows={1}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                maxLength={500}
+                placeholder="Ask about calls, clients, or market tape…"
+                className="h-10 min-h-[40px] max-h-24 w-full resize-none rounded border border-slate-300 bg-white px-3 py-2 text-[12.5px] text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-800"
+              />
+            </div>
+            <Button
+              type="submit"
+              variant="dark"
+              size="icon"
+              disabled={busy || !input.trim()}
+              aria-label="Send"
+              className="h-10 w-10 shrink-0 rounded bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center"
+            >
+              <Send size={15} strokeWidth={2} />
+            </Button>
           </form>
+
+          <div className="border-t border-slate-200 bg-white px-3 py-1.5 flex items-center justify-between text-[10.5px] text-slate-500 font-medium">
+            <span className="flex items-center gap-1">
+              <ShieldCheck size={12} className="text-slate-700" /> Read-only audited data
+            </span>
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

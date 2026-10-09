@@ -13,24 +13,24 @@
   --color-line-strong: #c4cfd9;
   --color-ink: #213547;
   --color-ink-2: #425b70;
-  --color-muted: #62788a;
-  --color-subtle: #718497;
+  --color-muted: #52677c;
+  --color-subtle: #52677c;
 
-  --color-navy: #213343;
+  --color-navy: #172b3e;
   --color-navy-2: #2a4053;
   --color-navy-line: #354a5c;
 
-  --color-brand: #087f8c;
+  --color-brand: #086d77;
   --color-brand-600: #066674;
   --color-brand-50: #eaf6f7;
   --color-brand-100: #cbe9ec;
   --color-cyan: #00b8e6;
 
-  --color-up: #0f8a5f;
+  --color-up: #0b704b;
   --color-up-50: #e6f5ee;
   --color-down: #c8352f;
   --color-down-50: #fbeceb;
-  --color-amber: #d9870b;
+  --color-amber: #8a5408;
   --color-amber-50: #fdf3df;
 
   /* Brief surfaces share the workspace palette; figures retain tabular numerals. */
@@ -83,28 +83,13 @@ body {
 }
 .fact:hover, .fact[data-state="open"] { background: var(--color-brand-50); border-bottom-color: var(--color-brand); }
 
-/* Hide all scrollbar appearances globally while preserving scroll functionality */
-* {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
-}
-*::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
-.scroll-thin,
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.scroll-thin::-webkit-scrollbar,
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
+/* Visible, restrained scrollbars preserve discoverability for tables and readers. */
+* { scrollbar-width: thin; scrollbar-color: #aebdca transparent; }
+*::-webkit-scrollbar { width: 7px; height: 7px; }
+*::-webkit-scrollbar-thumb { background: #aebdca; border-radius: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
 @keyframes shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
 .skeleton {
@@ -119,7 +104,8 @@ body {
 .rise { animation: rise .28s ease-out both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton, .live-dot, .rise { animation: none; }
+  .skeleton, .live-dot, .rise, .animate-spin { animation: none; }
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
 }
 
 /* ---- shared patterns (shell) ---- */
@@ -160,3 +146,8 @@ body {
   body { background: white; }
 }
 /* ---- end brief-ui ---- */
+
+/* The workspace owns one viewport; only its content and reader panels scroll. */
+html:has(.app-shell), body:has(.app-shell) { height: 100%; overflow: hidden; overscroll-behavior: none; }
+.app-shell { position: fixed; inset: 0; width: 100%; height: 100dvh; min-height: 0; }
+.app-main { min-height: 0; overscroll-behavior-y: contain; }

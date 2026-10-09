@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   // migrations are read from disk at startup (Supabase), so they must ship with the server bundle
   outputFileTracingIncludes: { "/**": ["./supabase/migrations/**/*", "./src/lib/db/local-stubs.sql"] },
   async redirects() {
-    return [{ source: "/settings", destination: "/setup", permanent: false }];
+    return [{source:'/settings',destination:'/setup',permanent:false},...['today','today-brief','calls','agent','desk','pipeline','feeds','qc','deliveries','compliance','demo-control'].map(p=>({source:'/'+p+'/:path*',destination:'/brief',permanent:false}))];
   },
   poweredByHeader: false,
   devIndicators: false,

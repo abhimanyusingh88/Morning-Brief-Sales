@@ -69,7 +69,7 @@ describe("/api/health", () => {
     const body = await (await GET()).json();
     expect(body.database.ok).toBe(true);
     expect(body.ai.configured).toBe(false);
-    expect(body.market.simulated).toBe(true);
+    expect(body.market.simulated).toBe(false);
   });
 });
 

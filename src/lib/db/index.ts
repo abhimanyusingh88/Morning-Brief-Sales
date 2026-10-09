@@ -3,7 +3,7 @@ export type { Db, Q, Row } from "./types";
 
 const g = globalThis as unknown as { __mbDb?: Promise<Db>; __mbDbVersion?: number };
 // Bump when connection configuration changes: Next hot reload preserves globals.
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 /** One shared handle per server process. */
 export function getDb(): Promise<Db> {
@@ -24,11 +24,6 @@ export function getDb(): Promise<Db> {
         db = openPostgres(url);
         const applied = await db.migrate?.();
         if (applied?.length) console.log(`[db] applied migrations: ${applied.join(", ")}`);
-      }
-      // Seed (embedded only) and prepare today's briefs in the background; pages show progress meanwhile.
-      if (!process.env.VITEST && !process.env.MB_NO_BOOT) {
-        const { ensureWorld } = await import("../bootstrap");
-        void ensureWorld(db, { seed: embedded });
       }
       return db;
     })();

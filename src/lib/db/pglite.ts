@@ -39,8 +39,10 @@ export async function openPglite(dataDir?: string): Promise<{ db: Db; pg: PGlite
     asUser: (profileId, fn) =>
       serial(() =>
         pg.transaction(async (tx) => {
+          const identities=await tx.query<{auth_user_id:string|null}>('select auth_user_id from profiles where id=$1 and is_active',[profileId]);
+          const subject=identities.rows[0]?.auth_user_id??profileId;
           await tx.query("set local role authenticated");
-          await tx.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: profileId, role: "authenticated" })]);
+          await tx.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: subject, role: "authenticated" })]);
           return fn(runner(tx));
         }),
       ),

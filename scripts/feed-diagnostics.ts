@@ -1,0 +1,2 @@
+import { collectPublisherFeeds } from '../src/lib/live/feeds';
+async function main(){const r=await collectPublisherFeeds(['NVDA','TSLA','INTC','MRVL','AMZN'],AbortSignal.timeout(60000));console.log(JSON.stringify({successful:r.successful,total:r.total,articles:r.articles.map(a=>({title:a.title,url:a.url,publishedAt:a.publishedAt}))},null,2));}main().catch(()=>{console.error('Public news feeds unavailable');process.exitCode=1;});

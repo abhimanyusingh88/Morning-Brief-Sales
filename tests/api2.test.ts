@@ -52,13 +52,14 @@ describe("/api/preferences", () => {
 });
 
 describe("/api/search", () => {
-  it("returns pages and only the caller's clients", async () => {
+  it("returns current pages without falling back to legacy synthetic clients", async () => {
     const db = await testDb();
     const { GET } = await import("../src/app/api/search/route");
     const mine = (await db.asUser(rahman, (q) => q<{ name: string }>(`select name from clients limit 1`)))[0].name;
     const theirs = (await db.asService((q) => q<{ name: string }>(`select c.name from clients c where not exists (select 1 from coverage v where v.client_id = c.id and v.profile_id = $1) limit 1`, [rahman])))[0].name;
     const body = async (term: string) => (await GET(new Request(`http://x/api/search?q=${encodeURIComponent(term)}`, { headers: cookie(rahman) }))).json();
-    expect((await body(mine)).hits.some((h: { kind: string; label: string }) => h.kind === "client" && h.label === mine)).toBe(true);
+    expect((await body(mine)).hits.some((h: { kind: string; label: string }) => h.kind === "client" && h.label === mine)).toBe(false);
+    expect((await body("brief")).hits.some((h: { kind: string; href: string }) => h.kind === "page" && h.href === "/brief")).toBe(true);
     expect((await body(theirs)).hits.some((h: { kind: string }) => h.kind === "client")).toBe(false);
     expect((await GET(new Request("http://x/api/search?q=a"))).status).toBe(401);
   });
