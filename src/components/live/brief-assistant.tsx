@@ -25,6 +25,7 @@ import type { Answer } from '@/lib/live/assistant';
 import type { ThreadMessage, ThreadSummary } from '@/lib/live/threads';
 import { NewsEffects } from './news-effects';
 import { Figures } from '@/components/ui/figures';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 type Message = {
   thinking?: string;
@@ -493,15 +494,29 @@ export function BriefAssistant({
     setQuestion('');
     requestAnimationFrame(() => input.current?.focus());
   };
-  const remove = async (id: string) => {
+  // Deleting a chat is confirmed first; the dialog stays open with an error if the delete fails.
+  const [pendingDelete, setPendingDelete] = useState<ThreadSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const askRemove = (t: ThreadSummary) => {
+    setDeleteError('');
+    setPendingDelete(t);
+  };
+  const remove = async () => {
+    if (!pendingDelete) return;
+    const id = pendingDelete.id;
+    setDeleting(true);
+    setDeleteError('');
     try {
       const r = await fetch('/api/live/threads/' + id, { method: 'DELETE' });
-      if (r.ok) {
-        setThreads((t) => t.filter((x) => x.id !== id));
-        if (id === threadId) newChat();
-      }
+      if (!r.ok) throw new Error();
+      setThreads((t) => t.filter((x) => x.id !== id));
+      if (id === threadId) newChat();
+      setPendingDelete(null);
     } catch {
-      /* keep list */
+      setDeleteError('The chat could not be deleted. Try again.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -700,7 +715,7 @@ export function BriefAssistant({
                             type="button"
                             aria-label={'Delete chat: ' + t.title}
                             title="Delete chat"
-                            onClick={() => remove(t.id)}
+                            onClick={() => askRemove(t)}
                             className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted opacity-0 transition-opacity hover:bg-down-50 hover:text-down focus-visible:opacity-100 group-hover:opacity-100"
                           >
                             <Trash2 size={13} />
@@ -936,6 +951,20 @@ export function BriefAssistant({
           </section>
         </Dialog.Content>
       </Dialog.Portal>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+        title="Delete this chat?"
+        body={
+          <>
+            <span className="font-medium text-ink">“{pendingDelete?.title}”</span> and its messages will be permanently
+            deleted. This cannot be undone.
+          </>
+        }
+        busy={deleting}
+        error={deleteError}
+        onConfirm={remove}
+      />
     </Dialog.Root>
   );
 }
