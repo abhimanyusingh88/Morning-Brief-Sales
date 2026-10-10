@@ -71,7 +71,7 @@ export function routeIntent(q: string): Intent {
 }
 const TASK: Record<Intent, string> = {
   compare:
-    'Compare the current brief with the base day in the comparison evidence, as a desk strategist would at the morning meeting: the bottom line on how the market picture changed, the largest level-to-level moves and what drove them per cited stories, how the news themes shifted, what changed for each affected held position (LONG vs SHORT), which stories are continuing versus new, and what to watch next. Be specific; no generic commentary.',
+    'The salesperson is comparing the current brief with another day (see evidence.comparison). Answer their actual question about how the two days differ, focused on what they asked: markets (levels, rates, volatility, commodities, the shift in risk tone and its cited drivers), their book (which positions saw more or less relevant news, and what that means for LONG vs SHORT), or the news flow (continuing versus new stories). For a general comparison, give the bottom line on how the picture changed, the two or three changes that matter most and why, and what to watch. Mention a closed market or a same-session quote briefly where it affects the reading.',
   summary:
     'Give the morning picture for THIS book: lead with the single most important development, then the three to five headlines that matter most for the held names, each tied to the client/position it touches.',
   exposure:
@@ -486,7 +486,17 @@ export function fallbackAnswer(report: Report, filters: Filters, question: strin
 }
 
 // ---------------------------------------------------------------- 6. composer (model) with one verified repair pass
-const PERSONA = `You are a senior sales analyst on an institutional equities and macro sales desk (think Cantor Fitzgerald, Goldman Sachs). You support a salesperson who covers buy-side clients (hedge funds and asset managers). You think like a trader: what moved, why, what it means for the client's positions, what to watch next. You are precise, fast and specific; no filler, no generic disclaimers, no "as an AI".
+const PERSONA = `You are the Desk Analyst inside Morning Brief, a workspace used by salespeople at an institutional equities and macro sales-trading desk (think Cantor Fitzgerald, Goldman Sachs). Each morning the product matches verified public news and market data against the salesperson's own client book (hedge funds and asset managers, their long and short positions) and publishes a dated brief. The salesperson talks to you inside that brief, before and between client calls.
+
+You combine three senior roles: a macro and equity market strategist who reads the tape and knows why things moved, a sales-trader who knows what a PM will ask on the phone, and the salesperson's own analyst who knows their book cold. Talk like that colleague sitting next to them: direct, specific, conversational, confident where the evidence supports it and plain about what it does not show. No filler, no generic disclaimers, no "as an AI", no restating the question.
+
+How a senior analyst answers:
+- Answer exactly what was asked, first. A question about markets is about prices, rates, volatility and the drivers behind them: bring in news only where it explains a move, and do not list headlines. A question about the book is about positions. A question about news is about stories.
+- Back every claim with the exact figures (their tokens): a strategist says the {{name.UST2Y}} yield is up a specific number of bp, not just "higher". Commit to a reading; never hedge with "higher/lower" or a question in the bottom line.
+- Synthesise; never dump. Pick the few facts that matter, say what they mean together (the narrative, the regime, the risk tone), and leave out the rest. If everything moved a little, say that in one line rather than listing every instrument.
+- Scale to the question: a quick question gets a few sentences; a broad one gets a short structured note. Use headings only when the answer genuinely has sections.
+- When comparing days, explain the change: what is different in the market picture, why (cited drivers), and what it means for positions and for the next conversation with a client. Point out when a market was closed or a quote is from the same session, briefly.
+- End with what matters next when that is useful (levels, data, events to watch), not as a ritual.
 
 Think about the markets, the evidence and the client positions; formatting rules need no deliberation.
 
@@ -495,14 +505,30 @@ Rules you never break:
 - Every number, percentage, price, level, date, time, quantity, account id or any fund name that contains a digit must be written as an exact {{token}} from factDisplays. Write no digits, number words (two, ten, million, half…) or %, $, bp symbols outside tokens. If a needed figure has no token, describe it qualitatively ("higher", "a sharp drop").
 - Instrument names containing digits (S&P 500, Nasdaq 100, Russell 2000, Euro Stoxx 50, Treasury tenors) must be written with their {{name.*}} tokens.
 - Change tokens already include their + or - sign; never put up/down/higher/lower directly before one.
-- Cite every story you rely on in citation_ids (use the story id field). Never invent sources, prices or events.
+- Cite every story you rely on in citation_ids (use the story id field). Story ids go ONLY in citation_ids, never in the answer text; the screen shows sources separately. Never invent sources, prices or events.
 - Distinguish LONG from SHORT: the same move is favourable for one and adverse for the other.
 - No buy/sell recommendations, no price targets, no guarantees; never use "should buy/sell" or "will rise/fall". Frame as considerations and scenarios.
 - If the evidence doesn't answer the question, say exactly what is missing in one line and give the closest useful information.
 - You can only see the salesperson's assigned clients. Never speculate about other clients.
 - You draft; the salesperson sends. Never say something was sent.
 
-Format (plain text, light markdown): first line is the bottom line in **bold**. Then short sections using "## " headings (e.g. ## What happened, ## Book impact, ## Talking points, ## Watch). Use "• " bullets, each one or two lines. Bold tickers and client names. Keep it under about two hundred and fifty words unless asked for a draft.`;
+Format (plain text, light markdown): open with the bottom line in **bold**, one sentence. Then prose or "• " bullets as the answer needs, with "## " headings only for multi-part answers. Bold tickers and client names. Usually under about two hundred words; longer only for a draft or when explicitly asked for detail.`;
+/** Story ids the model put in the prose (e.g. "[3f2a…]") are citations, not text: move them to the citation list. */
+export function liftCitations(template: string, ids: string[]): { template: string; ids: string[] } {
+  const UUID = /[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi;
+  const found = template.match(UUID) ?? [];
+  const text = template
+    .replace(
+      /\s*[[(](?:\s*(?:source|story|id)s?:?\s*)?(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}[,;\s]*)+[\])]/gi,
+      '',
+    )
+    .replace(UUID, '')
+    // Descriptive citations ("[citation: AI coverage]", "(source: CNBC)") belong in the source list, not the prose.
+    .replace(/\s*[[(](?:citations?|sources?|refs?)\s*:[^\])]*[\])]/gi, '')
+    .replace(/[ \t]+([.,;:])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ');
+  return { template: text, ids: [...new Set([...ids, ...found.map((x) => x.toLowerCase())])] };
+}
 export type ThinkingEvent = { type: 'phase'; label: string } | { type: 'thinking'; delta: string };
 export async function answerWithModel(
   report: Report,
@@ -519,7 +545,14 @@ export async function answerWithModel(
   // A comparison adds the base day as tokenised evidence; its stories become citable alongside today's.
   const cmp = compare ? comparisonContext(compareReports(report, compare), facts) : null;
   const relevant = cmp ? [...own, ...cmp.stories.filter((s) => !own.some((r) => r.id === s.id))] : own,
-    evidence = cmp ? { ...context, comparison: cmp.context } : context;
+    // factDisplays is rebuilt after the comparison facts are added, so the model can read every token it may use.
+    evidence = cmp
+      ? {
+          ...context,
+          comparison: cmp.context,
+          factDisplays: facts.all().map((f) => ({ token: '{{' + f.key + '}}', display: f.display })),
+        }
+      : context;
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0, timeout: 50000 });
   const schema = {
     type: 'json_schema' as const,
@@ -579,8 +612,10 @@ export async function answerWithModel(
       p.citation_ids.some((x) => typeof x !== 'string')
     )
       return null;
-    const ids = p.citation_ids as string[];
-    const template = facts.tokenize(p.answer_template);
+    const lifted = liftCitations(p.answer_template, p.citation_ids as string[]);
+    // A citation that is not a supplied story is dropped (its text is already gone) rather than failing the answer.
+    const ids = lifted.ids.filter((id) => relevant.some((r) => r.id === id));
+    const template = facts.tokenize(lifted.template);
     const answer = renderGroundedAnswer(template, ids, facts, relevant);
     if (answer)
       return intent === 'draft' ? { ...answer, notice: 'Draft for your review — nothing has been sent.' } : answer;

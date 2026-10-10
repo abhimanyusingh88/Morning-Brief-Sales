@@ -1,7 +1,8 @@
 import * as React from 'react';
 
-// A figure: optional sign, digits with separators/decimals, optional unit. Currency prefix allowed.
-const FIGURE = /([+\-−]?\$?\d[\d,]*(?:\.\d+)?\s?(?:%|bp|bps|pts?|[KMBT]\b|x\b)?)/g;
+// A figure: optional sign, digits with separators/decimals, optional unit. Currency prefix allowed. A sign attached to
+// a preceding digit or letter is a hyphen ("2026-10-09", "S-1"), not a minus.
+const FIGURE = /((?:(?<![\w.])[+\-−])?\$?\d[\d,]*(?:\.\d+)?\s?(?:%|bp|bps|pts?|[KMBT]\b|x\b)?)/g;
 const UP =
   /\b(up|higher|rose|risen|rises|rising|gain|gained|gains|added|adds|climbed|climbs|rallied|rallies|jumped|jumps|surged|surges|advanced|advances|beat|beats|increase[sd]?)\s+(?:by\s+|of\s+|to\s+)?$/i;
 const DOWN =

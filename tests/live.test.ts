@@ -1152,7 +1152,7 @@ describe('day comparison in the desk analyst', () => {
     desk: null,
   });
   it('computes level-to-level moves with the brief’s unit rules and classifies stories', async () => {
-    const { compareReports, comparisonAnswer } = await import('../src/lib/live/compare');
+    const { compareReports, comparisonAnswer, comparisonFocus } = await import('../src/lib/live/compare');
     const base = report(
       '2026-10-08',
       [
@@ -1192,7 +1192,10 @@ describe('day comparison in the desk analyst', () => {
     expect(c.themes.find((t) => t.topic === 'AI')).toMatchObject({ base: 0, current: 1 });
     const text = comparisonAnswer(c);
     expect(text).toContain('+100.0bp');
-    expect(text).toContain('No longer leading');
+    expect(text).toContain('US equities');
+    expect(comparisonFocus('how are markets different?')).toBe('markets');
+    expect(comparisonAnswer(c, 'how are markets different?')).not.toContain('## Your book');
+    expect(comparisonAnswer(c, 'what changed for my positions?')).toContain('**NVDA** Long');
     expect(text).not.toMatch(/NaN|undefined/);
   });
   it('compares through the chat endpoint and rejects missing or same days', async () => {
@@ -1287,5 +1290,25 @@ describe('stored article readings', () => {
     expect((row.payload as { basis: string }).basis).toBe('article');
     const again = await getReadingBrief(db, art as never, false, true);
     expect(again?.sections[0].body).toBe('Full text downloaded earlier.');
+  });
+});
+describe('analyst answer harness', () => {
+  it('moves inline story ids and descriptive citations out of the prose', async () => {
+    const { liftCitations } = await import('../src/lib/live/assistant');
+    const id = 'adeadbdc-6b9f-1308-ebe0-0123456789ab';
+    const r = liftCitations(
+      `Credit concerns grew [${id}]. Yields rose (source: CNBC). Watch CPI [citation: AI coverage].`,
+      [],
+    );
+    expect(r.ids).toEqual([id]);
+    expect(r.template).toBe('Credit concerns grew. Yields rose. Watch CPI.');
+  });
+  it('colours signed moves but not the hyphens inside dates', async () => {
+    const { createElement } = await import('react');
+    const { renderToStaticMarkup } = await import('react-dom/server');
+    const { Figures } = await import('../src/components/ui/figures');
+    const html = renderToStaticMarkup(createElement(Figures, { text: 'S&P 500 -6.3bp · same 2026-10-09 session' }));
+    expect(html).toContain('text-down">-6.3bp');
+    expect(html).not.toMatch(/text-down">-(10|09)/);
   });
 });

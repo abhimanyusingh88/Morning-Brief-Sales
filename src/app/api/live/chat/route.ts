@@ -108,7 +108,7 @@ async function answer(id: string, b: z.infer<typeof Body>, emit: (e: ThinkingEve
         ? {
             method: 'facts',
             notice: 'Comparison computed from the two saved briefs.',
-            answer: comparisonAnswer(compareReports(report, compare)),
+            answer: comparisonAnswer(compareReports(report, compare), b.question),
             sources: [],
           }
         : fallbackAnswer(report, filters, b.question, live);

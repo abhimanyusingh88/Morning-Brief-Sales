@@ -121,12 +121,61 @@ export function compareReports(current: Report, base: Report): Comparison {
     },
   };
 }
-const day = (d: string) => displayDay(d);
-const signed = (n: number) => (n > 0 ? '+' : '') + n;
-/** A complete, code-written comparison for the chat: used directly, and as the fallback when no model answer verifies. */
-export function comparisonAnswer(c: Comparison): string {
-  const a = day(c.current.day),
-    b = day(c.base.day);
+export type ComparisonFocus = 'markets' | 'book' | 'news' | 'all';
+/** What a comparison question is about, so the answer leads with that rather than everything. */
+export function comparisonFocus(question: string): ComparisonFocus {
+  const q = question.toLowerCase();
+  if (/\b(position|positions|book|client|clients|holding|holdings|exposure|exposed|portfolio)\b/.test(q)) return 'book';
+  if (/\b(news|stor(y|ies)|headline|headlines|theme|themes|narrative|coverage)\b/.test(q)) return 'news';
+  if (
+    /\b(market|markets|price|prices|yield|yields|rate|rates|treasur|vix|volatility|oil|crude|brent|wti|gold|silver|bitcoin|crypto|equit|index|indices|s&p|nasdaq|dow|russell|stoxx|bond|tape|risk)/.test(
+      q,
+    )
+  )
+    return 'markets';
+  return 'all';
+}
+const moveOf = (c: Comparison, key: string) => c.metrics.find((m) => m.key === key)?.move ?? null;
+const sessionNote = (m: MetricDelta) =>
+  m.stale
+    ? ' · unchanged quote (market closed)'
+    : m.session
+      ? ' · same ' + displayDay(m.session) + ' session, later quote'
+      : '';
+/** One computed line on how the market picture changed: equities, rates and volatility. */
+function bottomLine(c: Comparison): string {
+  const eq = ['SPX', 'NDX', 'RUT', 'DJI'].map((k) => moveOf(c, k)).filter((m): m is NonNullable<typeof m> => !!m);
+  const avg = eq.length ? eq.reduce((s, m) => s + m.value, 0) / eq.length : null;
+  const two = moveOf(c, 'UST2Y'),
+    vix = c.metrics.find((m) => m.key === 'VIX');
+  const parts = [
+    avg === null
+      ? null
+      : Math.abs(avg) < 25
+        ? 'US equities little changed'
+        : avg > 0
+          ? 'US equities higher'
+          : 'US equities lower',
+    two
+      ? two.value > 0
+        ? 'front-end yields up ' + two.label
+        : two.value < 0
+          ? 'front-end yields down ' + two.label
+          : null
+      : null,
+    vix?.move ? (vix.move.value < 0 ? 'volatility lower' : vix.move.value > 0 ? 'volatility higher' : null) : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(', ') : 'No market level is comparable across the two briefs';
+}
+/**
+ * The code-written comparison, used when no model answer verifies. Like an analyst it answers the question asked:
+ * a computed bottom line, then only the markets, book or news view the question is about (all three, briefly, if general).
+ */
+export function comparisonAnswer(c: Comparison, question = ''): string {
+  const a = displayDay(c.current.day),
+    b = displayDay(c.base.day),
+    focus = comparisonFocus(question),
+    n = focus === 'all' ? 4 : 8;
   const moved = c.metrics
     .filter((m) => m.move)
     .sort(
@@ -134,61 +183,45 @@ export function comparisonAnswer(c: Comparison): string {
         Math.abs(y.move!.value) / (y.move!.label.endsWith('bp') ? 100 : 1) -
         Math.abs(x.move!.value) / (x.move!.label.endsWith('bp') ? 100 : 1),
     );
-  const lines = [
-    `**${a} versus ${b} — ${c.scope}**`,
-    `Briefs compared: ${a} (published ${stamp(c.current.cutoff)}, ${c.current.stories} stories) and ${b} (published ${stamp(c.base.cutoff)}, ${c.base.stories} stories).`,
-    '## Markets, level to level',
+  const markets = [
+    '## Markets',
     ...(moved.length
-      ? moved.map(
-          (m) =>
-            `• **${m.label}**: ${m.base} → ${m.current} (${m.move!.label}${m.levelChange ? ', ' + m.levelChange : ''})${m.stale ? ' · same observation on both days (market closed)' : m.session ? ' · both from the ' + m.session + ' session (earlier quote, then later quote)' : ''}`,
-        )
+      ? moved
+          .slice(0, n)
+          .map(
+            (m) =>
+              `• **${m.label}** ${m.move!.label}${m.levelChange ? ' (' + m.levelChange + ')' : ''}: ${m.base} → ${m.current}${sessionNote(m)}`,
+          )
       : ['• No market level is available on both days.']),
-    ...(c.metrics.some((m) => !m.move)
-      ? [
-          '• Not comparable (missing on one day): ' +
-            c.metrics
-              .filter((m) => !m.move)
-              .map((m) => m.label)
-              .join(', '),
-        ]
-      : []),
-    '## Session moves on each day',
-    ...c.metrics
-      .filter((m) => m.baseSession || m.currentSession)
-      .slice(0, 8)
-      .map((m) => `• **${m.label}**: ${b} ${m.baseSession ?? 'n/a'} · ${a} ${m.currentSession ?? 'n/a'}`),
-    '## Themes in the news',
-    ...(c.themes.length
-      ? c.themes
-          .slice(0, 6)
-          .map((t) => `• **${t.topic}**: ${t.base} → ${t.current} stories (${signed(t.current - t.base)})`)
-      : ['• No tagged themes on either day.']),
-    '## Your book',
-    ...c.holdings
-      .filter((h) => h.base || h.current)
-      .slice(0, 8)
-      .map(
-        (h) =>
-          `• **${h.symbol}** ${h.direction} (${h.clients.join(', ')}): ${h.base} → ${h.current} direct or peer stories`,
-      ),
-    ...(c.holdings.every((h) => !h.base && !h.current)
-      ? ['• No direct or peer news on held names on either day.']
-      : []),
-    '## Continuing stories',
-    ...(c.continuing.length
-      ? c.continuing.slice(0, 5).map((s) => `• ${s.current.title} — ${s.current.publisher}`)
-      : ['• No event appears in the top stories of both days.']),
-    '## New since ' + b,
-    ...(c.newStories.length
-      ? c.newStories.slice(0, 5).map((s) => `• ${s.title} — ${s.publisher}`)
-      : ['• Nothing new reached the top of the book.']),
-    ...(c.faded.length
-      ? ['## No longer leading', ...c.faded.slice(0, 4).map((s) => `• ${s.title} — ${s.publisher}`)]
-      : []),
-    `Level-to-level moves compare each brief's latest observation (indices and yields in bp, commodities and crypto in percent, VIX also in points). Observations are timestamped in the briefs; a market closed on one day carries its previous session.`,
   ];
-  return lines.join('\n');
+  const touched = c.holdings.filter((h) => h.base !== h.current).slice(0, n);
+  const book = [
+    '## Your book',
+    ...(touched.length
+      ? touched.map(
+          (h) =>
+            `• **${h.symbol}** ${h.direction} (${h.clients.join(', ')}): ${h.base} → ${h.current} relevant stories`,
+        )
+      : ['• News flow on held names is unchanged between the two briefs.']),
+  ];
+  const news = [
+    '## News flow',
+    ...c.themes
+      .filter((t) => t.base !== t.current)
+      .slice(0, focus === 'news' ? 5 : 3)
+      .map((t) => `• **${t.topic}** coverage ${t.current > t.base ? 'up' : 'down'}: ${t.base} → ${t.current} stories`),
+    ...c.newStories.slice(0, focus === 'news' ? 5 : 2).map((s) => `• New: ${s.title} (${s.publisher})`),
+    ...c.continuing
+      .slice(0, focus === 'news' ? 3 : 1)
+      .map((s) => `• Continuing: ${s.current.title} (${s.current.publisher})`),
+  ];
+  const sections =
+    focus === 'markets' ? [markets] : focus === 'book' ? [book] : focus === 'news' ? [news] : [markets, book, news];
+  return [
+    `**${a} versus ${b}: ${bottomLine(c)}.**`,
+    ...sections.flat(),
+    `Compared within ${c.scope}; figures are each brief's latest timestamped observation.`,
+  ].join('\n');
 }
 /** The comparison as model evidence: every figure is a fact token, so the validator still rejects invented numbers. */
 export function comparisonContext(c: Comparison, facts: FactBook) {
