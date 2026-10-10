@@ -4,7 +4,7 @@ import { FactBook } from '../ai/facts';
 import { validateText } from '../ai/validator';
 import { plain,verifyDocument } from './news';
 import { fetchPublic,openUrl } from './fetch';
-import { extractMainText,matchesStory,resolvePublisherUrl } from './resolve';
+import { extractMainText,isCodeLike,matchesStory,resolvePublisherUrl } from './resolve';
 
 import { businessDate } from './time';
 import type { Db } from '../db/types';
@@ -19,13 +19,13 @@ export function fullTextAuthorized(url:string,hosts=process.env.NEWS_FULL_TEXT_H
 }
 export function extractArticleText(html:string):string{
  const records:string[]=[];
- function walk(v:unknown,depth=0){if(depth>12)return;if(Array.isArray(v))v.forEach(x=>walk(x,depth+1));else if(v&&typeof v==='object'){const o=v as Record<string,unknown>;if(typeof o.articleBody==='string')records.push(o.articleBody.replace(/<\/(?:p|h[1-6]|li|blockquote)>/gi,'\n\n').split(/\n\s*\n/).map(plain).filter(Boolean).join('\n\n'));Object.values(o).forEach(x=>walk(x,depth+1));}}
+ function walk(v:unknown,depth=0){if(depth>12)return;if(Array.isArray(v))v.forEach(x=>walk(x,depth+1));else if(v&&typeof v==='object'){const o=v as Record<string,unknown>;if(typeof o.articleBody==='string')records.push(o.articleBody.replace(/<\/(?:p|h[1-6]|li|blockquote)>/gi,'\n\n').split(/\n\s*\n/).map(plain).filter(s=>s&&!isCodeLike(s)).join('\n\n'));Object.values(o).forEach(x=>walk(x,depth+1));}}
  for(const m of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)){try{walk(JSON.parse(m[1]));}catch{}}
  if(records.length)return records.sort((a,b)=>b.length-a.length)[0];
  const marker=/<div\b[^>]*class=["'][^"']*ArticleBody-articleBody[^"']*["'][^>]*>/i.exec(html);
  let body=marker?html.slice(marker.index):/<article\b[^>]*>([\s\S]*?)<\/article>/i.exec(html)?.[1]??/<main\b[^>]*>([\s\S]*?)<\/main>/i.exec(html)?.[1]??'';
  if(marker){const footer=body.search(/class=["'][^"']*(?:RelatedContent|ArticleFooter|SidebarArticle)/i);if(footer>0)body=body.slice(0,footer);}
- return [...body.matchAll(/<(?:p|h[2-4]|li|blockquote)\b[^>]*>([\s\S]*?)<\/(?:p|h[2-4]|li|blockquote)>/gi)].map(m=>plain(m[1])).filter(s=>s.length>0&&!/^(?:sign up|subscribe|accept cookies|all rights reserved)/i.test(s)).join('\n\n');
+ return [...body.matchAll(/<(?:p|h[2-4]|li|blockquote)\b[^>]*>([\s\S]*?)<\/(?:p|h[2-4]|li|blockquote)>/gi)].map(m=>plain(m[1])).filter(s=>s.length>0&&!isCodeLike(s)&&!/^(?:sign up|subscribe|accept cookies|all rights reserved)/i.test(s)).join('\n\n');
 }
 function excerptBrief(article:Article):ReadingBrief{return {sections:[{heading:'Publisher excerpt',body:article.excerpt}],basis:'excerpt',fetchedAt:new Date().toISOString(),sourceUrl:article.url};}
 export function readerFacts(article:Article,text:string){

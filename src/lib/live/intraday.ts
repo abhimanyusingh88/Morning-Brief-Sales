@@ -1,5 +1,5 @@
 import { fetchSource } from './fetch';
-import { businessDate } from './time';
+import { businessDate,etOffset } from './time';
 import type { Db } from '../db/types';
 // Delayed public chart data. Every series carries its source URL and the provider's own market timestamp.
 export type Series={symbol:string;label:string;points:{t:number;v:number}[];last:number;previousClose:number|null;changePct:number|null;at:string;currency:string|null;source:string;url:string};
@@ -18,6 +18,13 @@ export function parseChart(text:string,symbol:string,label:string,url:string):Se
 export async function getSeries(symbol:string,label=symbol,range:'1d'|'5d'='1d',interval:'5m'|'15m'|'30m'='5m'):Promise<Series|null>{
  const url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(symbol)+'?range='+range+'&interval='+interval+'&includePrePost=true';
  try{return await cached('s:'+url,4*60000,async()=>{const r=await fetchSource(url,AbortSignal.timeout(7000));return parseChart(r.text,symbol,label,url);});}catch{return null;}
+}
+/** One past ET business day's intraday series (backfill). Last value and time come from that day's final point. */
+export async function getSeriesForDay(symbol:string,label:string,day:string,interval:'5m'|'15m'='5m'):Promise<Series|null>{
+ const start=Date.parse(day+'T00:00:00'+etOffset(new Date(day+'T12:00:00Z'))),end=start+86400000;
+ const url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(symbol)+'?period1='+start/1000+'&period2='+end/1000+'&interval='+interval+'&includePrePost=true';
+ try{const r=await fetchSource(url,AbortSignal.timeout(9000));const s=parseChart(r.text,symbol,label,url);const last=s.points.at(-1);if(!last)return null;
+  return {...s,last:last.v,changePct:s.previousClose?(last.v/s.previousClose-1)*100:null,at:new Date(last.t).toISOString()};}catch{return null;}
 }
 export async function getMovers(symbols:string[]):Promise<Series[]>{
  const out=await Promise.all([...new Set(symbols)].slice(0,40).map(s=>getSeries(s,s,'1d','15m')));return out.filter((x):x is Series=>!!x);

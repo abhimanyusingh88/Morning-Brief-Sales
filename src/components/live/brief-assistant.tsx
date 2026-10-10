@@ -138,7 +138,7 @@ function Composer({ value, onChange, onSend, busy, picker, inputRef, large }: { 
   );
 }
 
-export function BriefAssistant({ report, filters, clients }: { report: Report; filters: Filters; clients: Client[] }) {
+export function BriefAssistant({ report, filters, clients, archived = false }: { report: Report; filters: Filters; clients: Client[]; archived?: boolean }) {
   const [picked, setPicked] = useState<string[]>(report.clientId ? [report.clientId] : []);
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState('');
@@ -156,8 +156,10 @@ export function BriefAssistant({ report, filters, clients }: { report: Report; f
   const scope = [pickedName, filters.topic, filters.symbol, filters.q && '“' + filters.q + '”'].filter(Boolean).join(' · ');
 
   const loadThreads = useCallback(async () => {
-    try { const r = await fetch('/api/live/threads'); if (r.ok) setThreads((await r.json()).threads); } catch { /* history is optional */ }
-  }, []);
+    // Chats are listed per brief day: each conversation belongs to the day of the brief it was asked about.
+    try {
+    const r = await fetch('/api/live/threads?date=' + report.businessDate); if (r.ok) setThreads((await r.json()).threads); } catch { /* history is optional */ }
+  }, [report.businessDate]);
   useEffect(() => { if (open) void loadThreads(); }, [open, loadThreads]);
   useEffect(() => { conversation.current?.scrollTo({ top: conversation.current.scrollHeight, behavior: 'smooth' }); }, [messages]);
   useEffect(() => { if (busy) conversation.current?.scrollTo({ top: conversation.current.scrollHeight, behavior: 'smooth' }); }, [busy]);
@@ -219,7 +221,7 @@ export function BriefAssistant({ report, filters, clients }: { report: Report; f
 
   const shown = search ? threads.filter((t) => t.title.toLowerCase().includes(search.toLowerCase())) : threads;
   const today = new Date().toDateString();
-  const groups = [{ label: 'Today', items: shown.filter((t) => dayKey(t.updatedAt) === today) }, { label: 'Earlier', items: shown.filter((t) => dayKey(t.updatedAt) !== today) }].filter((g) => g.items.length);
+  const groups = archived ? [{ label: 'Chats on this brief', items: shown }].filter((g) => g.items.length) : [{ label: 'Today', items: shown.filter((t) => dayKey(t.updatedAt) === today) }, { label: 'Earlier', items: shown.filter((t) => dayKey(t.updatedAt) !== today) }].filter((g) => g.items.length);
   const title = threads.find((t) => t.id === threadId)?.title ?? 'New conversation';
 
   return (
@@ -266,7 +268,7 @@ export function BriefAssistant({ report, filters, clients }: { report: Report; f
             {!messages.length && !loading ? (
               <div className="flex min-h-0 flex-1 flex-col items-center justify-center bg-bg px-6">
                 <div className="w-full max-w-[680px]">
-                  <p className="text-center text-[20px] font-semibold tracking-[-0.02em] text-ink">What do you need for today&apos;s book?</p>
+                  <p className="text-center text-[20px] font-semibold tracking-[-0.02em] text-ink">{archived ? 'Ask about this day’s brief' : 'What do you need for today’s book?'}</p>
                   <p className="mb-6 mt-1.5 text-center text-[13px] text-muted">Answers use the brief&apos;s verified evidence, your clients&apos; positions and live prices.</p>
                   <Composer value={question} onChange={setQuestion} onSend={() => send(question)} busy={busy} picker={<ScopePicker clients={clients} selected={picked} onChange={setPicked} />} inputRef={input} large />
                   {error ? <p role="alert" className="mt-3 text-center text-[12px] text-down">{error}</p> : null}

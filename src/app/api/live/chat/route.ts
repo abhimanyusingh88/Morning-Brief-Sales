@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { getDb } from '@/lib/db';
 import { loadMe,meFromRequest } from '@/lib/auth/session';
 import { sameOrigin } from '@/lib/live/delivery';
-import { getCoverage,getReport,narrowReport } from '@/lib/live/reports';
+import { getCoverage,getDayReport,getReport,getReportVersion,narrowReport } from '@/lib/live/reports';
 import { parseFilters } from '@/lib/live/presentation';
 import { businessDate } from '@/lib/live/time';
 import { answerFromReport,answerWithModel,fallbackAnswer,type ThinkingEvent } from '@/lib/live/assistant';
@@ -20,18 +20,21 @@ async function answer(id:string,b:z.infer<typeof Body>,emit:(e:ThinkingEvent)=>v
  const picked=b.clients?.length?b.clients:null;
  if(picked){const cov=await getCoverage(db,id);if(picked.some(c=>!cov.clients.some(x=>x.id===c)))return fail(400,'Select clients from your coverage.');}
  emit({type:'phase',label:'Reading the brief and client positions'});
- const base=await getReport(db,id,picked?null:b.client,picked?undefined:b.report);
+ const version=await getReportVersion(db,id,b.client,b.report);if(!version)return fail(409,'Refresh the brief before asking about this report.');
+ // A past day's brief is answered from its own snapshot; picking clients narrows that day's all-clients version.
+ const archived=Boolean(version.archived),base=!picked?version:archived?(version.clientId?await getDayReport(db,id,null,version.businessDate):version):await getReport(db,id,null);
  const report=base&&picked?narrowReport(base,picked):base;
- if(!report||report.businessDate!==businessDate())return fail(409,'Refresh the brief before asking about this report.');
+ if(!report)return fail(409,'Refresh the brief before asking about this report.');
  const filters=parseFilters(new URLSearchParams(b.filters));
  // Each conversation is isolated: context comes only from this thread's stored messages, never from the client.
  const thread=await ensureThread(db,id,b.thread,b.question);if(!thread)return fail(404,'Conversation not found');
  const history=b.thread?await threadHistory(db,id,thread):[];
  let result=answerFromReport(report,filters,b.question);
  if(!result){
-  emit({type:'phase',label:'Checking live prices and today’s calendar'});
+  if(!archived)emit({type:'phase',label:'Checking live prices and today’s calendar'});
   // Public quotes for held symbols and the public calendar; no client data leaves the server.
-  const live=await Promise.all([getMovers(report.coverage),getCalendar(new Date(),db)]).then(([movers,calendar])=>({movers,calendar}));
+  // Today's quotes and calendar would misdate a past brief, so an archived day is answered from its own evidence only.
+  const live=archived?undefined:await Promise.all([getMovers(report.coverage),getCalendar(new Date(),db)]).then(([movers,calendar])=>({movers,calendar}));
   if(process.env.OPENAI_API_KEY){
    const reserved=await db.asService(q=>q('insert into live_assistant_usage(profile_id,day,calls) values($1,$2,1) on conflict(profile_id,day) do update set calls=live_assistant_usage.calls+1,last_call=now() where live_assistant_usage.calls<60 and live_assistant_usage.last_call<now()-interval \'3 seconds\' returning calls',[id,businessDate()]));
    if(reserved.length)try{result=await answerWithModel(report,filters,b.question,history,live,emit);}catch(e){const error=e as {name?:string;status?:number;code?:string};console.warn('[live-assistant] analysis_unavailable',error.name??'Error',error.status??'',error.code??'');}
@@ -40,10 +43,10 @@ async function answer(id:string,b:z.infer<typeof Body>,emit:(e:ThinkingEvent)=>v
  }
  if(!result)return fail(422,'The answer could not be grounded in this report. Try a more specific question; no unsupported answer was shown.');
  // Recheck assignment, report evidence and preference changes after any model request.
- if(!await getReport(db,id,picked?null:b.client,picked?base!.id:b.report))return fail(409,'Your client scope changed. Reload the brief.');
+ if(!await getReportVersion(db,id,picked?null:b.client,picked?base!.id:b.report))return fail(409,'Your client scope changed. Reload the brief.');
  await db.asUser(id,q=>q('insert into live_assistant_messages(profile_id,report_id,question,answer,source_ids,method,thread_id,notice) values($1,$2,$3,$4,$5,$6,$7,$8)',[id,base!.id,b.question,result!.answer,result!.sources.map(s=>s.id),result!.method,thread,result!.notice??null]));
  await db.asUser(id,q=>q('update live_assistant_threads set updated_at=now() where id=$1',[thread]));
- return {status:200,body:{...result,thread,reportId:report.id,clientName:report.clientName,cutoff:report.cutoff}};
+ return {status:200,body:{...result,thread,reportId:report.id,clientName:report.clientName,cutoff:report.cutoff,businessDate:report.businessDate,archived}};
 }
 
 export async function POST(request:Request){

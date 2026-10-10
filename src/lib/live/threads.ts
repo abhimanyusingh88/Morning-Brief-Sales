@@ -3,8 +3,11 @@ import type { Db } from '../db/types';
 export type ThreadSummary={id:string;title:string;updatedAt:string;messages:number};
 export type ThreadMessage={question:string;answer:string;notice:string|null;method:string;at:string;sources:{id:string;title:string;url:string;publishedAt:string;publisher:string}[]};
 const iso=(x:unknown)=>x instanceof Date?x.toISOString():String(x);
-export async function listThreads(db:Db,profileId:string):Promise<ThreadSummary[]>{
- const rows=await db.asUser(profileId,q=>q('select t.id,t.title,t.updated_at,(select count(*)::int from live_assistant_messages m where m.thread_id=t.id) n from live_assistant_threads t where t.profile_id=$1 order by t.updated_at desc limit 100',[profileId]));
+/** Newest first; with a business day, only conversations asked about that day's brief. */
+export async function listThreads(db:Db,profileId:string,day?:string):Promise<ThreadSummary[]>{
+ const rows=await db.asUser(profileId,q=>day
+  ?q('select t.id,t.title,t.updated_at,(select count(*)::int from live_assistant_messages m where m.thread_id=t.id) n from live_assistant_threads t where t.profile_id=$1 and exists(select 1 from live_assistant_messages m join live_reports r on r.id=m.report_id where m.thread_id=t.id and r.business_date=$2) order by t.updated_at desc limit 100',[profileId,day])
+  :q('select t.id,t.title,t.updated_at,(select count(*)::int from live_assistant_messages m where m.thread_id=t.id) n from live_assistant_threads t where t.profile_id=$1 order by t.updated_at desc limit 100',[profileId]));
  return rows.map(r=>({id:String(r.id),title:String(r.title),updatedAt:iso(r.updated_at),messages:Number(r.n)}));
 }
 export async function getThreadMessages(db:Db,profileId:string,threadId:string):Promise<ThreadMessage[]|null>{

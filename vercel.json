@@ -12,7 +12,7 @@
       "maxDuration": 240
     },
     "src/app/api/live/refresh/route.ts": {
-      "maxDuration": 240
+      "maxDuration": 60
     },
     "src/app/api/live/effects/route.ts": {
       "maxDuration": 150

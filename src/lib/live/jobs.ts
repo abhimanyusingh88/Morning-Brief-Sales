@@ -5,6 +5,7 @@ import { collectMarket,MARKET_SOURCES,type SourceResult } from './market';
 import { collectNews,type NewsResult } from './news';
 import { hash,publishReports } from './reports';
 import { sendMorningBrief } from './email';
+import { capturePanels } from './snapshots';
 export type Job={id:string;kind:'market'|'news'|'publish';payload:Record<string,unknown>;lease_token:string;attempts:number};
 export async function enqueue(q:Q,kind:Job['kind'],key:string,payload:Record<string,unknown>={}){
  await q('insert into live_jobs(kind,job_key,payload) values($1,$2,$3::jsonb) on conflict(job_key) do nothing',[kind,key,JSON.stringify(payload)]);
@@ -43,6 +44,8 @@ export async function refresh(db:Db,opts:{budgetMs?:number;reconcile?:boolean;ki
  }
  // Publication reads persisted verified evidence; source failures cannot replace it with invented values.
  if(deadline-Date.now()>3000)await publishReports(db);
+ // Save today's public charts and calendar so the day's brief can always show them later.
+ if(deadline-Date.now()>12000)await capturePanels(db).catch(()=>console.warn('[snapshots] capture_failed'));
  // Email the finished brief once it is due (default 09:30 ET on weekdays); idempotent per recipient and day.
  if(deadline-Date.now()>25000)await sendMorningBrief(db).catch(()=>console.warn('[email] brief_send_failed'));
  return {completed,failed};

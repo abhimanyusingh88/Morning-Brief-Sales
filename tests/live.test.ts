@@ -187,3 +187,50 @@ describe('grounded AI effects and private caching',()=>{
   const cached=await req(a,body);expect(cached.status).toBe(200);expect((await cached.json()).overview).toBe('Cached article-specific analysis');
  });
 });
+describe('brief history',()=>{
+ const past=new Date('2026-10-01T18:00:00Z');let id='';
+ const cookie=(p:string)=>({cookie:'mb_session='+signSession(p)});
+ beforeAll(async()=>{const report=await makeReport(db,a,null,past);const [r]=await db.asService(q=>q('insert into live_reports(profile_id,input_client_ids,business_date,cutoff,coverage_hash,fingerprint,payload) values($1,$2,$3,$4,$5,$6,$7::jsonb) returning id',[a,[],report.businessDate,report.cutoff,report.coverageHash,'history-test',JSON.stringify(report)]));id=String(r.id);});
+ it('lists past days and opens the published snapshot only for its owner',async()=>{const {listHistory,getDayReport,getReportVersion,getArchivedReport}=await import('../src/lib/live/reports');
+  const days=await listHistory(db,a,null);expect(days.find(d=>d.businessDate==='2026-10-01')?.id).toBe(id);expect(await listHistory(db,b,null)).not.toEqual(expect.arrayContaining([expect.objectContaining({id})]));
+  const r=(await getDayReport(db,a,null,'2026-10-01'))!;expect(r.id).toBe(id);expect(r.archived).toBe(true);expect(r.businessDate).toBe('2026-10-01');
+  expect((await getReportVersion(db,a,null,id))?.archived).toBe(true);expect(await getArchivedReport(db,b,null,id)).toBeNull();expect(await getDayReport(db,a,null,'not-a-day')).toBeNull();});
+ it('keeps an old snapshot after the book changes but drops clients no longer covered',async()=>{const {getArchivedReport}=await import('../src/lib/live/reports');const client=uid('live:client:Z Investments');
+  const before=(await getArchivedReport(db,a,null,id))!;expect(before.holdings.some(h=>h.clientId===client)).toBe(true);
+  await db.asService(q=>q('delete from live_coverage where profile_id=$1 and client_id=$2',[a,client]));
+  try{const after=(await getArchivedReport(db,a,null,id))!;expect(after.holdings.length).toBeGreaterThan(0);expect(after.holdings.some(h=>h.clientId===client)).toBe(false);expect(after.articles.every(s=>s.matches.every(m=>m.clientId!==client))).toBe(true);}
+  finally{await db.asService(q=>q('insert into live_coverage values($1,$2)',[a,client]));}});
+ it('answers chat from a past brief and lists that day’s conversations',async()=>{const {POST}=await import('../src/app/api/live/chat/route');const {GET}=await import('../src/app/api/live/threads/route');
+  const res=await POST(new Request('http://localhost/api/live/chat',{method:'POST',headers:{'content-type':'application/json',...cookie(a)},body:JSON.stringify({report:id,client:null,question:'Show client holdings',filters:{q:'',topic:'',symbol:''}})}));
+  expect(res.status).toBe(200);const body=await res.json();expect(body.archived).toBe(true);expect(body.businessDate).toBe('2026-10-01');
+  const list=async(q:string)=>GET(new Request('http://localhost/api/live/threads'+q,{headers:cookie(a)}));
+  expect((await (await list('?date=2026-10-01')).json()).threads.map((t:{id:string})=>t.id)).toContain(body.thread);
+  expect((await (await list('?date=2026-09-30')).json()).threads.map((t:{id:string})=>t.id)).not.toContain(body.thread);
+  expect((await list('?date=bad')).status).toBe(400);
+  const foreign=await POST(new Request('http://localhost/api/live/chat',{method:'POST',headers:{'content-type':'application/json',...cookie(b)},body:JSON.stringify({report:id,client:null,question:'Show client holdings',filters:{q:'',topic:'',symbol:''}})}));expect(foreign.status).toBe(409);});
+ it('exports a past brief as PDF',async()=>{const {GET}=await import('../src/app/api/live/export/route');const pdf=await GET(new Request('http://localhost/api/live/export?report='+id,{headers:cookie(a)}));expect(pdf.status).toBe(200);expect(pdf.headers.get('content-type')).toBe('application/pdf');});
+});
+describe('article text extraction',()=>{
+ it('drops embedded video-player code from articleBody but keeps prose',async()=>{const {extractMainText,isCodeLike}=await import('../src/lib/live/resolve');
+  const widget='(() => { window.videoEmbeds = window.videoEmbeds || []; let data = {"slug":"03WC7","url":"https:\/\/cdn.ex.co\/master.m3u8"}; window.videoEmbeds.push({ elemId: \'video-container\', data: data }); })()';
+  const prose='Oracle and Broadcom are seeking debt financing for AI chips, putting leverage alongside revenue questions; investors are watching closely.';
+  const body=[prose,'Featured Video For You',widget,'The companies did not comment on the reported financing talks before publication of this story.'].join('\n\n');
+  const html='<script type="application/ld+json">'+JSON.stringify({'@type':'NewsArticle',articleBody:body})+'</script>';
+  const text=extractMainText(html);expect(text).toContain('Oracle and Broadcom');expect(text).toContain('did not comment');expect(text).not.toMatch(/videoEmbeds|Featured Video|m3u8/);
+  expect(isCodeLike(prose)).toBe(false);expect(isCodeLike('Rates rose; stocks fell; oil was flat.')).toBe(false);});
+});
+describe('history evidence and saved charts',()=>{
+ it('keeps a past report readable after a story is re-verified, but not today’s',async()=>{const {getDayReport}=await import('../src/lib/live/reports');
+  const art={id:uid('reverified-story')};await db.asService(q=>q("insert into live_articles(id,url,title,publisher,published_at,event_date,verified_at,symbols,topics,excerpt,evidence_hash,verification) values($1,'https://www.cnbc.com/2026/09/15/reverified.html','Chipmakers rally on AI demand','CNBC','2026-09-15T12:00:00Z','2026-09-15','2026-09-15T12:05:00Z',$2,$3,'Chipmakers rallied.','new-hash-after-reverification','publisher-page') on conflict(id) do nothing",[art.id,['NVDA'],['AI']]));
+  const base=await makeReport(db,a,null,new Date('2026-09-15T18:00:00Z'));const story={id:String(art.id),url:'https://www.cnbc.com/2026/09/15/reverified.html',title:'Chipmakers rally on AI demand',publisher:'CNBC',publishedAt:'2026-09-15T12:00:00Z',eventDate:'2026-09-15',verifiedAt:'2026-09-15T12:05:00Z',symbols:['NVDA'],topics:['AI'],excerpt:'Chipmakers rallied.',summaryTemplate:null,verification:'publisher-page',category:'company',reason:'Direct',score:80,importance:20,evidenceHash:'old-hash-before-reverification',matches:[]};
+  const insert=(date:string,fp:string)=>db.asService(q=>q('insert into live_reports(profile_id,input_client_ids,business_date,cutoff,coverage_hash,fingerprint,payload) values($1,$2,$3,now(),$4,$5,$6::jsonb) returning id',[a,[],date,base.coverageHash,fp,JSON.stringify({...base,businessDate:date,articles:[story]})]));
+  await insert('2026-09-15','reverified-past');const past=await getDayReport(db,a,null,'2026-09-15');expect(past?.articles.map(s=>s.id)).toEqual([String(art.id)]);
+  const [t]=await insert(businessDate(),'reverified-today');expect(await db.asUser(a,q=>q('select id from live_reports where id=$1',[t.id]))).toHaveLength(0);
+  await db.asService(q=>q("delete from live_reports where fingerprint in('reverified-past','reverified-today')"));});
+ it('serves a day’s saved futures chart and calendar for its past brief',async()=>{const {pastPanels}=await import('../src/lib/live/snapshots');
+  const series={symbol:'ES=F',label:'S&P 500 E-mini futures',points:[{t:1,v:6000},{t:2,v:6010}],last:6010,previousClose:6000,changePct:0.17,at:'2026-09-15T12:00:00Z',currency:'USD',source:'Yahoo Finance',url:'https://finance.yahoo.com/quote/ES=F'};
+  const calendar={events:[{time:'2026-09-15T12:30:00Z',title:'CPI m/m',country:'USD',impact:'High',forecast:'0.2%',previous:'0.3%'}],source:'Forex Factory',url:'https://nfs.faireconomy.media/ff_calendar_thisweek.json',fetchedAt:'2026-09-15T11:00:00Z',scope:'today'};
+  await db.asService(async q=>{await q("insert into live_market_snapshots(business_date,key,payload,source) values('2026-09-15','overnight:ES=F',$1::jsonb,'Yahoo Finance')",[JSON.stringify(series)]);await q("insert into live_market_snapshots(business_date,key,payload,source) values('2026-09-15','calendar',$1::jsonb,'Forex Factory')",[JSON.stringify(calendar)]);});
+  const p=await pastPanels(db,a,['NVDA'],'2026-09-15');expect(p.overnight.map(s=>s.symbol)).toEqual(['ES=F']);expect(p.calendar?.events[0].title).toBe('CPI m/m');expect(p.movers).toEqual([]);
+  expect((await pastPanels(db,a,['NVDA'],'2026-09-14')).overnight).toEqual([]);});
+});

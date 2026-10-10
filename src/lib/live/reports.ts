@@ -69,6 +69,37 @@ export async function getReport(db:Db,profileId:string,clientId:string|null,repo
  if(clientId&&!validId(clientId)||reportId&&!validId(reportId))return null;const c=await getCoverage(db,profileId);const prefs=await getPreferences(db,profileId);
  return db.asUser(profileId,async q=>{const rows=reportId?await q('select id,payload from live_reports where id=$1 and profile_id=$2',[reportId,profileId]):await q('select id,payload from live_reports where profile_id=$1 and scope_client is not distinct from $2::uuid and business_date=$3 and coverage_hash=$4 order by created_at desc limit 1',[profileId,clientId,businessDate(now),c.hash]);const r=rows[0];if(!r)return null;const payload=r.payload as Omit<Report,'id'>;if(payload.coverageHash!==c.hash||hash(payload.preferences)!==hash(prefs)||payload.clientId!==clientId)return null;return {...payload,id:String(r.id)};});
 }
+export type HistoryEntry={id:string;businessDate:string;cutoff:string;stories:number};
+export const validDay=(s:string)=>/^\d{4}-\d{2}-\d{2}$/.test(s)&&!Number.isNaN(Date.parse(s+'T12:00:00Z'));
+/**
+ * A past day's brief exactly as published, for the history view. Unlike today's brief it is not revoked when the book
+ * or preferences change; it is narrowed to the clients the person still covers, so revoked access stays revoked.
+ */
+export async function getArchivedReport(db:Db,profileId:string,clientId:string|null,reportId:string,now=new Date()):Promise<Report|null>{
+ if(!validId(reportId)||clientId&&!validId(clientId))return null;
+ const [row]=await db.asUser(profileId,q=>q('select id,payload from live_reports where id=$1 and profile_id=$2 and scope_client is not distinct from $3::uuid and business_date<$4',[reportId,profileId,clientId,businessDate(now)]));if(!row)return null;
+ const payload={...(row.payload as Omit<Report,'id'>),id:String(row.id),archived:true} as Report;if(payload.clientId!==clientId)return null;
+ const covered=new Set((await getCoverage(db,profileId)).clients.map(c=>c.id)),held=[...new Set(payload.holdings.map(h=>h.clientId))];
+ if(held.every(c=>covered.has(c)))return payload;if(clientId)return null;
+ const narrowed=narrowReport(payload,held.filter(c=>covered.has(c)));return narrowed?{...narrowed,clientName:payload.clientName}:null;
+}
+/** The final published brief for one past business day and client scope. */
+export async function getDayReport(db:Db,profileId:string,clientId:string|null,date:string,now=new Date()):Promise<Report|null>{
+ if(!validDay(date)||clientId&&!validId(clientId))return null;
+ const [row]=await db.asUser(profileId,q=>q('select id from live_reports where profile_id=$1 and scope_client is not distinct from $2::uuid and business_date=$3 order by created_at desc limit 1',[profileId,clientId,date]));
+ return row?getArchivedReport(db,profileId,clientId,String(row.id),now):null;
+}
+/** Past business days with a published brief for this scope, newest first: one entry (the final version) per day. */
+export async function listHistory(db:Db,profileId:string,clientId:string|null,now=new Date(),limit=60):Promise<HistoryEntry[]>{
+ if(clientId&&!validId(clientId))return [];
+ const rows=await db.asUser(profileId,q=>q("select distinct on(business_date) id,business_date,cutoff,jsonb_array_length(coalesce(payload->'articles','[]'::jsonb)) n from live_reports where profile_id=$1 and scope_client is not distinct from $2::uuid and business_date<$3 order by business_date desc,created_at desc limit $4",[profileId,clientId,businessDate(now),limit]));
+ return rows.map(r=>({id:String(r.id),businessDate:day(r.business_date),cutoff:iso(r.cutoff),stories:Number(r.n)}));
+}
+/** Any version the person may open: today's under the live checks, otherwise an archived snapshot. */
+export async function getReportVersion(db:Db,profileId:string,clientId:string|null,reportId:string,now=new Date()):Promise<Report|null>{
+ const live=await getReport(db,profileId,clientId,reportId,now);
+ return live&&live.businessDate===businessDate(now)?live:getArchivedReport(db,profileId,clientId,reportId,now);
+}
 export {parseFilters,filterStories,formatMetric,metricChange} from './presentation';
 /** Narrow an all-clients report to a chosen set of clients: their holdings, and story links to them only. */
 export function narrowReport(report:Report,clientIds:string[]):Report|null{
