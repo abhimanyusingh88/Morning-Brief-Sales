@@ -1,4 +1,4 @@
-import type { Factors, ScoredTrigger, Snapshot, Trigger } from "./types";
+import type { Factors, ScoredTrigger, Snapshot, Trigger } from './types';
 
 /** Weights are explicit so the model's explanation of "why this client" can quote them. */
 export const WEIGHTS = {
@@ -19,13 +19,13 @@ export function factorsFor(s: Snapshot, t: Trigger): Factors {
 
   const sizeScore = clamp(Math.log10(1 + t.exposureUsd / 5e6) / 1.5);
   const raw = 0.5 * sizeScore + 0.5 * clamp(t.exposureShare / 0.3);
-  const exposure = t.kind === "followup" ? 0.2 : t.kind === "macro_ahead" ? raw * 0.6 : clamp(raw);
+  const exposure = t.kind === 'followup' ? 0.2 : t.kind === 'macro_ahead' ? raw * 0.6 : clamp(raw);
 
   let magnitude: number;
-  if (t.kind === "move") magnitude = clamp(Math.max(t.z / 2.5, t.severity / 3 * 0.8));
-  else if (t.kind === "earnings") magnitude = 0.7;
-  else if (t.kind === "reactivation" || t.kind === "followup") magnitude = 0.3;
-  else if (t.kind === "macro_ahead") magnitude = clamp((t.severity / 3) * 0.55);
+  if (t.kind === 'move') magnitude = clamp(Math.max(t.z / 2.5, (t.severity / 3) * 0.8));
+  else if (t.kind === 'earnings') magnitude = 0.7;
+  else if (t.kind === 'reactivation' || t.kind === 'followup') magnitude = 0.3;
+  else if (t.kind === 'macro_ahead') magnitude = clamp((t.severity / 3) * 0.55);
   else magnitude = clamp(t.severity / 3);
 
   const relevance = t.tagsMatched.length ? 1 : t.exposureUsd > 0 ? 0.7 : 0.3;
@@ -35,17 +35,33 @@ export function factorsFor(s: Snapshot, t: Trigger): Factors {
   const fu = s.followups.get(t.clientId);
   const followupDue = fu && fu.dueOn <= s.businessDate ? 1 : 0;
 
-  const traded = s.trades.some((x) => x.clientId === t.clientId && t.instrumentIds.includes(x.instrumentId) && x.daysAgo <= 14);
+  const traded = s.trades.some(
+    (x) => x.clientId === t.clientId && t.instrumentIds.includes(x.instrumentId) && x.daysAgo <= 14,
+  );
   const recentFlow = traded ? 1 : 0;
   const recentContactPenalty = days <= 1 ? 1 : days <= 2 ? 0.5 : 0;
 
-  return { exposure, magnitude, relevance, timing: t.timing, relationship, contactGap, followupDue, recentFlow, recentContactPenalty };
+  return {
+    exposure,
+    magnitude,
+    relevance,
+    timing: t.timing,
+    relationship,
+    contactGap,
+    followupDue,
+    recentFlow,
+    recentContactPenalty,
+  };
 }
 
 export function scoreFactors(f: Factors): number {
   let x =
-    WEIGHTS.exposure * f.exposure + WEIGHTS.magnitude * f.magnitude + WEIGHTS.relevance * f.relevance +
-    WEIGHTS.timing * f.timing + WEIGHTS.relationship * f.relationship + WEIGHTS.contactGap * f.contactGap;
+    WEIGHTS.exposure * f.exposure +
+    WEIGHTS.magnitude * f.magnitude +
+    WEIGHTS.relevance * f.relevance +
+    WEIGHTS.timing * f.timing +
+    WEIGHTS.relationship * f.relationship +
+    WEIGHTS.contactGap * f.contactGap;
   x += 0.1 * f.followupDue + 0.05 * f.recentFlow;
   x *= 1 - 0.5 * f.recentContactPenalty;
   // rescale so a perfect trigger is ~100 and ordinary good ones land in the 60s-80s

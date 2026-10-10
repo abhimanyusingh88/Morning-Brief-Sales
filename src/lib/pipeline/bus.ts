@@ -1,5 +1,5 @@
 /** In-process fan-out of pipeline progress, so the monitor can stream a run as it happens. */
-import type { FeedState } from "../feeds/connectors";
+import type { FeedState } from '../feeds/connectors';
 
 export interface StepState {
   seq: number;
@@ -9,7 +9,7 @@ export interface StepState {
   simAt: string;
   key: string;
   label: string;
-  status: "pending" | "running" | "succeeded" | "failed" | "skipped";
+  status: 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped';
   startedAt: string | null;
   finishedAt: string | null;
   rowsIn: number | null;
@@ -19,14 +19,18 @@ export interface StepState {
 }
 
 export type PipelineEvent =
-  | { type: "run"; runId: string; businessDate: string; status: "running" | "succeeded" | "failed"; steps: StepState[] }
-  | { type: "step"; runId: string; step: StepState }
-  | { type: "feed"; runId: string; feed: FeedState }
-  | { type: "log"; runId: string; key: string; line: string; at: string }
-  | { type: "done"; runId: string; status: "succeeded" | "failed"; summary: Record<string, unknown> };
+  | { type: 'run'; runId: string; businessDate: string; status: 'running' | 'succeeded' | 'failed'; steps: StepState[] }
+  | { type: 'step'; runId: string; step: StepState }
+  | { type: 'feed'; runId: string; feed: FeedState }
+  | { type: 'log'; runId: string; key: string; line: string; at: string }
+  | { type: 'done'; runId: string; status: 'succeeded' | 'failed'; summary: Record<string, unknown> };
 
 type Listener = (e: PipelineEvent) => void;
-interface Channel { events: PipelineEvent[]; listeners: Set<Listener>; closed: boolean }
+interface Channel {
+  events: PipelineEvent[];
+  listeners: Set<Listener>;
+  closed: boolean;
+}
 
 const g = globalThis as unknown as { __mbBus?: Map<string, Channel> };
 const channels = (g.__mbBus ??= new Map());
@@ -35,7 +39,7 @@ export function publish(runId: string, e: PipelineEvent) {
   let ch = channels.get(runId);
   if (!ch) channels.set(runId, (ch = { events: [], listeners: new Set(), closed: false }));
   ch.events.push(e);
-  if (e.type === "done") ch.closed = true;
+  if (e.type === 'done') ch.closed = true;
   for (const l of ch.listeners) l(e);
   // keep memory bounded: only recent runs are replayable from memory
   if (channels.size > 20) channels.delete(channels.keys().next().value as string);

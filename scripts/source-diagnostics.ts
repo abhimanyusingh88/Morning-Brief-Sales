@@ -1,4 +1,34 @@
 import { fetchSource } from '../src/lib/live/fetch';
-import { parseYahoo,parseTreasury } from '../src/lib/live/market';
-async function main(){const urls=['https://finance.yahoo.com/quote/%5EGSPC/','https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value=2026'];for(const url of urls){let r;try{r=await fetchSource(url,AbortSignal.timeout(12000),url.includes('yahoo'));}catch(e){console.log('Source',url,e instanceof Error?e.message:'failed');continue;}console.log('Public HTML bytes',r.text.length);try{console.log('Parsed exact quote',url.includes('yahoo')?parseYahoo(r.text,'SPX',r.url):parseTreasury(r.text,'2026'));}catch(e){console.log('Parser',e instanceof Error?e.message:'failed');}for(const field of ['<feed','regularMarketTime']){const i=r.text.indexOf(field);console.log(field, i, i>=0?r.text.slice(Math.max(0,i-120),i+650):'absent');}}}
-main().catch(e=>{console.error(e instanceof Error?e.message:'Source unavailable');process.exitCode=1;});
+import { parseYahoo, parseTreasury } from '../src/lib/live/market';
+async function main() {
+  const urls = [
+    'https://finance.yahoo.com/quote/%5EGSPC/',
+    'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value=2026',
+  ];
+  for (const url of urls) {
+    let r;
+    try {
+      r = await fetchSource(url, AbortSignal.timeout(12000), url.includes('yahoo'));
+    } catch (e) {
+      console.log('Source', url, e instanceof Error ? e.message : 'failed');
+      continue;
+    }
+    console.log('Public HTML bytes', r.text.length);
+    try {
+      console.log(
+        'Parsed exact quote',
+        url.includes('yahoo') ? parseYahoo(r.text, 'SPX', r.url) : parseTreasury(r.text, '2026'),
+      );
+    } catch (e) {
+      console.log('Parser', e instanceof Error ? e.message : 'failed');
+    }
+    for (const field of ['<feed', 'regularMarketTime']) {
+      const i = r.text.indexOf(field);
+      console.log(field, i, i >= 0 ? r.text.slice(Math.max(0, i - 120), i + 650) : 'absent');
+    }
+  }
+}
+main().catch((e) => {
+  console.error(e instanceof Error ? e.message : 'Source unavailable');
+  process.exitCode = 1;
+});

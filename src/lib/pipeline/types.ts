@@ -1,11 +1,11 @@
-import type { MoveUnit } from "../market/types";
+import type { MoveUnit } from '../market/types';
 
 export interface InstrumentInfo {
   id: string;
   symbol: string;
   name: string;
   sector: string | null;
-  assetClass: "equity" | "rates" | "credit" | "fx" | "commodity" | "index" | "vol";
+  assetClass: 'equity' | 'rates' | 'credit' | 'fx' | 'commodity' | 'index' | 'vol';
   unit: MoveUnit;
   decimals: number;
   vol: number;
@@ -26,12 +26,12 @@ export interface ClientInfo {
   segment: string;
   tier: 1 | 2 | 3;
   aumUsdMn: number;
-  status: "active" | "dormant" | "prospect";
+  status: 'active' | 'dormant' | 'prospect';
 }
 
 export interface EventInfo {
   id: string;
-  kind: "earnings" | "macro" | "news" | "rating" | "flow" | "research" | "corporate_action";
+  kind: 'earnings' | 'macro' | 'news' | 'rating' | 'flow' | 'research' | 'corporate_action';
   title: string;
   summary: string;
   occurredAt: string;
@@ -56,13 +56,13 @@ export interface Snapshot {
   interests: Map<string, string[]>;
   lastContact: Map<string, { daysAgo: number; kind: string; subject: string; note: string }>;
   followups: Map<string, { id: string; dueOn: string; text: string }>;
-  trades: { clientId: string; instrumentId: string; side: "buy" | "sell"; notionalUsd: number; daysAgo: number }[];
+  trades: { clientId: string; instrumentId: string; side: 'buy' | 'sell'; notionalUsd: number; daysAgo: number }[];
   events: EventInfo[];
   restrictedInstrumentIds: Set<string>;
   prefs: Map<string, { maxCards: number }>;
 }
 
-export type TriggerKind = "move" | "earnings" | "event" | "macro_ahead" | "followup" | "reactivation";
+export type TriggerKind = 'move' | 'earnings' | 'event' | 'macro_ahead' | 'followup' | 'reactivation';
 
 export interface Trigger {
   kind: TriggerKind;
@@ -77,7 +77,7 @@ export interface Trigger {
   exposureShare: number;
   /** largest |move| / typical daily move across instruments in the trigger */
   z: number;
-  direction: "up" | "down" | "flat";
+  direction: 'up' | 'down' | 'flat';
   severity: 1 | 2 | 3;
   /** how time-critical the trigger is, 0..1 */
   timing: number;
@@ -108,7 +108,7 @@ export interface Candidate {
   profileId: string;
   clientId: string;
   score: number;
-  urgency: "now" | "today" | "this_week";
+  urgency: 'now' | 'today' | 'this_week';
   primary: ScoredTrigger;
   others: ScoredTrigger[];
 }

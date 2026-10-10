@@ -1,5 +1,5 @@
-import type { Db } from "./types";
-export type { Db, Q, Row } from "./types";
+import type { Db } from './types';
+export type { Db, Q, Row } from './types';
 
 const g = globalThis as unknown as { __mbDb?: Promise<Db>; __mbDbVersion?: number };
 // Bump when connection configuration changes: Next hot reload preserves globals.
@@ -12,18 +12,19 @@ export function getDb(): Promise<Db> {
     g.__mbDbVersion = DB_VERSION;
     g.__mbDb = (async () => {
       if (previous) await previous.then((db) => db.close()).catch(() => undefined);
-      const embedded = process.env.DEV_DB === "pglite" || (!process.env.DATABASE_URL && process.env.NODE_ENV !== "production");
+      const embedded =
+        process.env.DEV_DB === 'pglite' || (!process.env.DATABASE_URL && process.env.NODE_ENV !== 'production');
       let db: Db;
       if (embedded) {
-        const { openPglite } = await import("./pglite");
-        db = (await openPglite(process.env.PGLITE_DIR || ".data/pglite")).db;
+        const { openPglite } = await import('./pglite');
+        db = (await openPglite(process.env.PGLITE_DIR || '.data/pglite')).db;
       } else {
         const url = process.env.DATABASE_URL;
-        if (!url) throw new Error("DATABASE_URL is not set");
-        const { openPostgres } = await import("./postgres");
+        if (!url) throw new Error('DATABASE_URL is not set');
+        const { openPostgres } = await import('./postgres');
         db = openPostgres(url);
         const applied = await db.migrate?.();
-        if (applied?.length) console.log(`[db] applied migrations: ${applied.join(", ")}`);
+        if (applied?.length) console.log(`[db] applied migrations: ${applied.join(', ')}`);
       }
       return db;
     })();
@@ -31,4 +32,5 @@ export function getDb(): Promise<Db> {
   return g.__mbDb;
 }
 
-export const isEmbedded = () => process.env.DEV_DB === "pglite" || (!process.env.DATABASE_URL && process.env.NODE_ENV !== "production");
+export const isEmbedded = () =>
+  process.env.DEV_DB === 'pglite' || (!process.env.DATABASE_URL && process.env.NODE_ENV !== 'production');

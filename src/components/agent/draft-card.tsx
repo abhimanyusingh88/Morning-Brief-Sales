@@ -1,31 +1,39 @@
-"use client";
+'use client';
 
-import { Check, Copy, ExternalLink, FileText, Mail, ShieldCheck } from "lucide-react";
-import * as React from "react";
-import { Button } from "@/components/ui/button";
-import { RichText } from "@/components/ui/fact";
-import type { AgentDraft, FactView } from "@/lib/agent/types";
-import { cn } from "@/lib/cn";
+import { Check, Copy, ExternalLink, FileText, Mail, ShieldCheck } from 'lucide-react';
+import * as React from 'react';
+import { Button } from '@/components/ui/button';
+import { RichText } from '@/components/ui/fact';
+import type { AgentDraft, FactView } from '@/lib/agent/types';
+import { cn } from '@/lib/cn';
 
 /** The draft with every {{token}} replaced by its stored display value. */
 export const renderDraft = (d: AgentDraft, facts: Record<string, FactView>) =>
-  d.template.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => facts[k]?.display ?? "");
+  d.template.replace(/\{\{([^}]+)\}\}/g, (_, k: string) => facts[k]?.display ?? '');
 
 /**
  * Enterprise Draft Composer Card (HubSpot / CRM style).
  * Compact fonts, monochrome corporate colors, explicit sales review guardrails.
  */
-export function DraftCard({ draft, facts, compact }: { draft: AgentDraft; facts: Record<string, FactView>; compact?: boolean }) {
+export function DraftCard({
+  draft,
+  facts,
+  compact,
+}: {
+  draft: AgentDraft;
+  facts: Record<string, FactView>;
+  compact?: boolean;
+}) {
   const [copied, setCopied] = React.useState(false);
   const text = renderDraft(draft, facts);
-  const mailto = `mailto:?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(text.replace(/\n/g, "\r\n"))}`;
+  const mailto = `mailto:?subject=${encodeURIComponent(draft.subject)}&body=${encodeURIComponent(text.replace(/\n/g, '\r\n'))}`;
   const copy = () => {
     void navigator.clipboard?.writeText(`${draft.subject}\n\n${text}`).then(
       () => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1600);
       },
-      () => undefined
+      () => undefined,
     );
   };
 
@@ -34,8 +42,8 @@ export function DraftCard({ draft, facts, compact }: { draft: AgentDraft; facts:
       {/* Enterprise Header Bar */}
       <div
         className={cn(
-          "flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-slate-800 bg-slate-900 text-white",
-          compact ? "px-3 py-2" : "px-4 py-2.5"
+          'flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 border-b border-slate-800 bg-slate-900 text-white',
+          compact ? 'px-3 py-2' : 'px-4 py-2.5',
         )}
       >
         <div className="flex min-w-0 items-center gap-2">
@@ -62,7 +70,7 @@ export function DraftCard({ draft, facts, compact }: { draft: AgentDraft; facts:
             className="h-7 px-2 bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 hover:text-white text-[11px]"
           >
             {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-            <span>{copied ? "Copied" : "Copy"}</span>
+            <span>{copied ? 'Copied' : 'Copy'}</span>
           </Button>
           <Button
             size="sm"
@@ -82,7 +90,7 @@ export function DraftCard({ draft, facts, compact }: { draft: AgentDraft; facts:
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50 px-3 py-1.5 text-[11.5px] text-slate-600">
         <div className="flex items-center gap-1 font-medium">
           <span className="text-slate-400">Recipient:</span>
-          <span className="text-slate-900 font-semibold">{draft.to ? draft.to : "Unassigned"}</span>
+          <span className="text-slate-900 font-semibold">{draft.to ? draft.to : 'Unassigned'}</span>
         </div>
         <div className="flex items-center gap-1 text-[10.5px] text-slate-500 font-mono">
           <FileText size={11} className="text-slate-400" />
@@ -91,7 +99,12 @@ export function DraftCard({ draft, facts, compact }: { draft: AgentDraft; facts:
       </div>
 
       {/* Message Body Canvas */}
-      <div className={cn("whitespace-pre-line font-sans text-[12.5px] leading-relaxed text-slate-800 bg-white", compact ? "px-3 py-2.5" : "px-4 py-3")}>
+      <div
+        className={cn(
+          'whitespace-pre-line font-sans text-[12.5px] leading-relaxed text-slate-800 bg-white',
+          compact ? 'px-3 py-2.5' : 'px-4 py-3',
+        )}
+      >
         <RichText template={draft.template} facts={facts} />
       </div>
 
@@ -99,7 +112,9 @@ export function DraftCard({ draft, facts, compact }: { draft: AgentDraft; facts:
       <div className="flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-slate-600 font-medium">
         <div className="flex items-center gap-1.5 text-slate-700">
           <ShieldCheck size={13} className="shrink-0 text-slate-700" aria-hidden />
-          <span><strong>Human Review Required:</strong> Draft requires manual sales dispatch.</span>
+          <span>
+            <strong>Human Review Required:</strong> Draft requires manual sales dispatch.
+          </span>
         </div>
       </div>
     </section>

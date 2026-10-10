@@ -1,5 +1,5 @@
-"use client";
-import * as React from "react";
+'use client';
+import * as React from 'react';
 
 /** Re-renders on an interval while `active`, so only the component that calls it updates. */
 export function useNow(active: boolean, every = 120) {

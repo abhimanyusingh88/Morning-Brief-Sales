@@ -1,19 +1,19 @@
-import type { MoveUnit } from "./types";
+import type { MoveUnit } from './types';
 
-const sign = (n: number) => (n > 0 ? "+" : n < 0 ? "−" : "");
+const sign = (n: number) => (n > 0 ? '+' : n < 0 ? '−' : '');
 
 /** Equity/FX/commodity moves are percent; yields and spreads are basis points; VIX is points. */
 export function formatMove(unit: MoveUnit, chg: number): string {
   const a = Math.abs(chg);
-  if (unit === "bp") return `${sign(chg)}${a.toFixed(a >= 10 ? 1 : 1)} bp`;
-  if (unit === "pct") return `${sign(chg)}${a.toFixed(2)}%`;
+  if (unit === 'bp') return `${sign(chg)}${a.toFixed(a >= 10 ? 1 : 1)} bp`;
+  if (unit === 'pct') return `${sign(chg)}${a.toFixed(2)}%`;
   return `${sign(chg)}${a.toFixed(2)} pts`;
 }
 
 export function formatLevel(assetClass: string, last: number, decimals: number): string {
-  if (assetClass === "rates") return `${last.toFixed(3)}%`;
-  if (assetClass === "credit") return `${last.toFixed(1)} bp`;
-  return last.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  if (assetClass === 'rates') return `${last.toFixed(3)}%`;
+  if (assetClass === 'credit') return `${last.toFixed(1)} bp`;
+  return last.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
 export function formatUsd(n: number): string {

@@ -9,7 +9,7 @@ export interface Fact {
   value: number | null;
   /** exactly what is substituted into text */
   display: string;
-  unit: "pct" | "bp" | "usd" | "level" | "days" | "count" | "text" | "time";
+  unit: 'pct' | 'bp' | 'usd' | 'level' | 'days' | 'count' | 'text' | 'time';
   source: string;
   asOf: string; // ISO
   /** the connector this value came from, so a figure can be traced back to a feed run */
@@ -40,18 +40,23 @@ export class FactBook {
    * token; anything else still fails the validator. This recovers faithful answers without admitting new numbers.
    */
   tokenize(text: string): string {
-    const facts = this.all().filter((f) => /\p{N}/u.test(f.display) && f.display.length >= 2).sort((a, b) => b.display.length - a.display.length);
-    return text.split(/(\{\{[A-Za-z0-9_.:\-]+\}\})/g).map((part, i) => {
-      if (i % 2) return part;
-      let out = part;
-      for (const f of facts) {
-        if (!out.includes(f.display)) continue;
-        const esc = f.display.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        // Boundaries keep "5.2" from matching inside "15.25".
-        out = out.replace(new RegExp(`(?<![\\p{N}.])${esc}(?![\\p{N}])`, "gu"), `{{${f.key}}}`);
-      }
-      return out;
-    }).join("");
+    const facts = this.all()
+      .filter((f) => /\p{N}/u.test(f.display) && f.display.length >= 2)
+      .sort((a, b) => b.display.length - a.display.length);
+    return text
+      .split(/(\{\{[A-Za-z0-9_.:\-]+\}\})/g)
+      .map((part, i) => {
+        if (i % 2) return part;
+        let out = part;
+        for (const f of facts) {
+          if (!out.includes(f.display)) continue;
+          const esc = f.display.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          // Boundaries keep "5.2" from matching inside "15.25".
+          out = out.replace(new RegExp(`(?<![\\p{N}.])${esc}(?![\\p{N}])`, 'gu'), `{{${f.key}}}`);
+        }
+        return out;
+      })
+      .join('');
   }
 
   render(text: string): string {

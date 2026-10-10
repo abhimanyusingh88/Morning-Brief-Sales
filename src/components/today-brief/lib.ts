@@ -1,26 +1,29 @@
 /** Pure helpers for the Today's brief dashboard (no React, no I/O) so they can be tested on their own. */
 
 /** Dashboard columns: reading on the left, data on the right. Kinds not listed (or not in the brief) are skipped. */
-export const LEFT_KINDS = ["catalysts", "news", "earnings", "macro_fed"] as const;
-export const RIGHT_KINDS = ["chart", "sector_lead_lag", "movers", "overnight", "dividends", "index_rebalance"] as const;
+export const LEFT_KINDS = ['catalysts', 'news', 'earnings', 'macro_fed'] as const;
+export const RIGHT_KINDS = ['chart', 'sector_lead_lag', 'movers', 'overnight', 'dividends', 'index_rebalance'] as const;
 
 /** Sections filtered to the reader's sectors and products are "For you"; the rest are the same for every reader. */
-const PERSONAL = new Set(["overnight", "movers", "earnings", "news", "dividends", "index_rebalance"]);
-export const scopeOf = (kind: string): "personal" | "market" => (PERSONAL.has(kind) ? "personal" : "market");
+const PERSONAL = new Set(['overnight', 'movers', 'earnings', 'news', 'dividends', 'index_rebalance']);
+export const scopeOf = (kind: string): 'personal' | 'market' => (PERSONAL.has(kind) ? 'personal' : 'market');
 
 /** Benchmark tiles grouped the way a desk reads them. Symbols match the TILES list in src/lib/brief/build.ts. */
 export const SNAPSHOT_GROUPS = [
-  { title: "Equities", symbols: ["SPX", "NDX", "RTY", "DJI"] },
-  { title: "Rates & credit", symbols: ["UST10Y", "UST2Y", "CDXHY"] },
-  { title: "Risk & commodities", symbols: ["VIX", "XAU", "XAG", "WTI"] },
+  { title: 'Equities', symbols: ['SPX', 'NDX', 'RTY', 'DJI'] },
+  { title: 'Rates & credit', symbols: ['UST10Y', 'UST2Y', 'CDXHY'] },
+  { title: 'Risk & commodities', symbols: ['VIX', 'XAU', 'XAG', 'WTI'] },
 ] as const;
 
 /** Tiles in group order. Tiles the groups do not name land in a trailing "Other" group so nothing is dropped. */
 export function groupTiles<T extends { symbol: string }>(tiles: T[]): { title: string; tiles: T[] }[] {
   const named = new Set<string>(SNAPSHOT_GROUPS.flatMap((g) => g.symbols));
-  const out = SNAPSHOT_GROUPS.map((g) => ({ title: g.title as string, tiles: g.symbols.flatMap((s) => tiles.filter((t) => t.symbol === s)) }));
+  const out = SNAPSHOT_GROUPS.map((g) => ({
+    title: g.title as string,
+    tiles: g.symbols.flatMap((s) => tiles.filter((t) => t.symbol === s)),
+  }));
   const rest = tiles.filter((t) => !named.has(t.symbol));
-  if (rest.length) out.push({ title: "Other", tiles: rest });
+  if (rest.length) out.push({ title: 'Other', tiles: rest });
   return out.filter((g) => g.tiles.length);
 }
 
@@ -30,7 +33,7 @@ export function groupTiles<T extends { symbol: string }>(tiles: T[]): { title: s
  */
 export function magnitude(display: string | undefined): number {
   if (!display) return 0;
-  const n = Number(display.replace(/[−–]/g, "-").replace(/[^0-9.\-]/g, ""));
+  const n = Number(display.replace(/[−–]/g, '-').replace(/[^0-9.\-]/g, ''));
   return Number.isFinite(n) ? n : 0;
 }
 

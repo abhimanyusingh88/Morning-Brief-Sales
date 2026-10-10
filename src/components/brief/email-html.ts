@@ -18,5 +18,5 @@ export function emailPreviewHtml(html: string): string {
       table table table td { width: auto !important; min-width: 0; }
     }
   </style>`;
-  return html.replaceAll("Demo workspace:", "Workspace data:").replace(/<body\b/i, `${styles}<body`);
+  return html.replaceAll('Demo workspace:', 'Workspace data:').replace(/<body\b/i, `${styles}<body`);
 }

@@ -2,6 +2,82 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card,CardBody } from '@/components/ui/card';
-import { TOPICS,type Preferences } from '@/lib/live/types';
-export function Interests({prefs}:{prefs:Preferences}){const router=useRouter();const [selected,setSelected]=useState(prefs.sectors);const [symbols,setSymbols]=useState(prefs.symbols.join(', '));const [busy,setBusy]=useState(false);const [message,setMessage]=useState('');const save=async()=>{setBusy(true);try{const r=await fetch('/api/live/interests',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({sectors:selected,symbols:symbols.split(/[\s,]+/).map(s=>s.trim().toUpperCase()).filter(Boolean)})});const data=await r.json();if(!r.ok)throw new Error(data.error??'Could not save');setMessage('Interests saved. Your next report will reflect these topics.');router.refresh();}catch(e){setMessage(e instanceof Error?e.message:'Could not save. Try again.');}finally{setBusy(false);}};return <Card><CardBody className="space-y-5"><div><h2 className="font-semibold">Topics you cover</h2><p className="mt-1 text-xs text-muted">Holding relevance always applies. These topics add public industry news to your book.</p><div className="mt-4 flex flex-wrap gap-2">{TOPICS.map(t=><label key={t} className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs"><input type="checkbox" checked={selected.includes(t)} onChange={e=>setSelected(e.target.checked?[...selected,t]:selected.filter(x=>x!==t))}/>{t}</label>)}</div></div><label className="block text-sm font-medium">Additional public stock watchlist<input value={symbols} onChange={e=>setSymbols(e.target.value)} maxLength={300} placeholder="Tickers, separated by commas" className="mt-2 h-10 w-full rounded-lg border border-line px-3 text-sm"/></label><p className="text-xs text-muted">All report dates and times use US Eastern Time.</p><Button variant="primary" disabled={busy} onClick={save}>{busy?'Saving…':'Save interests'}</Button>{message?<p role="status" className="text-xs text-ink-2">{message}</p>:null}</CardBody></Card>}
+import { Card, CardBody } from '@/components/ui/card';
+import { TOPICS, type Preferences } from '@/lib/live/types';
+export function Interests({ prefs }: { prefs: Preferences }) {
+  const router = useRouter();
+  const [selected, setSelected] = useState(prefs.sectors);
+  const [symbols, setSymbols] = useState(prefs.symbols.join(', '));
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const save = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch('/api/live/interests', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sectors: selected,
+          symbols: symbols
+            .split(/[\s,]+/)
+            .map((s) => s.trim().toUpperCase())
+            .filter(Boolean),
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error ?? 'Could not save');
+      setMessage('Interests saved. Your next report will reflect these topics.');
+      router.refresh();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'Could not save. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card>
+      <CardBody className="space-y-5">
+        <div>
+          <h2 className="font-semibold">Topics you cover</h2>
+          <p className="mt-1 text-xs text-muted">
+            Holding relevance always applies. These topics add public industry news to your book.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {TOPICS.map((t) => (
+              <label
+                key={t}
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(t)}
+                  onChange={(e) => setSelected(e.target.checked ? [...selected, t] : selected.filter((x) => x !== t))}
+                />
+                {t}
+              </label>
+            ))}
+          </div>
+        </div>
+        <label className="block text-sm font-medium">
+          Additional public stock watchlist
+          <input
+            value={symbols}
+            onChange={(e) => setSymbols(e.target.value)}
+            maxLength={300}
+            placeholder="Tickers, separated by commas"
+            className="mt-2 h-10 w-full rounded-lg border border-line px-3 text-sm"
+          />
+        </label>
+        <p className="text-xs text-muted">All report dates and times use US Eastern Time.</p>
+        <Button variant="primary" disabled={busy} onClick={save}>
+          {busy ? 'Saving…' : 'Save interests'}
+        </Button>
+        {message ? (
+          <p role="status" className="text-xs text-ink-2">
+            {message}
+          </p>
+        ) : null}
+      </CardBody>
+    </Card>
+  );
+}

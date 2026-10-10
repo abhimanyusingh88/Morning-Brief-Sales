@@ -1,18 +1,85 @@
 import { COMPANIES } from './classify';
 import type { Story } from './types';
-export type HoldingEffect={clientId:string;client:string;symbol:string;direction:string;connection:string;channels:{label:string;possibility:string;confirm:string}[]};
-export function holdingEffects(story:Story):HoldingEffect[]{
- const unique=[...new Map(story.matches.map(m=>[m.clientId+':'+m.symbol+':'+m.direction,m])).values()];
- return unique.map(m=>{
-  const topics=new Set(story.topics),direct=story.symbols.includes(m.symbol),industry=COMPANIES[m.symbol]?.topics??[];
-  const channels:HoldingEffect['channels']=[];
-  if(topics.has('Oil'))channels.push({label:'Energy and operating costs',possibility:m.symbol==='AMZN'?'Changes in fuel prices could change delivery and fulfillment costs.':m.symbol==='TSLA'?'Changes in fuel prices could change the relative cost of driving electric vehicles and influence demand.':'Changes in energy costs could affect production costs and customer spending.',confirm:'Check the reported supply or price change, company cost exposure, hedging and any company guidance.'});
-  if(topics.has('Geopolitics')||topics.has('Trade'))channels.push({label:'Supply chains and market risk',possibility:industry.includes('Semiconductors')?'Disruptions or export restrictions could affect chip production, deliveries or access to customers.':'Disruptions, tariffs or sanctions could affect suppliers, deliveries, customer demand or investor risk appetite.',confirm:'Confirm the locations, trade routes, restrictions and customers involved before assuming a company impact.'});
-  if(topics.has('Rates')||topics.has('Credit'))channels.push({label:'Financing and valuation',possibility:'Changes in interest rates or credit conditions could change financing costs, customer spending and equity valuation assumptions.',confirm:'Check the actual rate or credit change and the company’s borrowing, refinancing needs and demand sensitivity.'});
-  if(topics.has('AI')||topics.has('Cloud')||topics.has('Semiconductors'))channels.push({label:'Technology demand and competition',possibility:industry.includes('Semiconductors')?'AI spending, new chip products or competing platforms could change demand, pricing or market share.':m.symbol==='AMZN'?'AI adoption and competing cloud products could change cloud demand, investment needs or pricing.':'New technology could change product demand, competitive positioning or investment needs.',confirm:'Check which companies and products are named, commercial availability, customer commitments and reported investment plans.'});
-  if(direct&&(topics.has('Earnings')||topics.has('Launches')))channels.push({label:topics.has('Earnings')?'Reported results and outlook':'Product launch or announcement',possibility:topics.has('Earnings')?'Changes in reported results or guidance could change expectations for revenue, margins or cash flow.':'Product adoption and execution could change revenue opportunities or costs; an announcement alone does not establish a financial effect.',confirm:topics.has('Earnings')?'Compare actual results and guidance with prior expectations and check management’s stated reasons.':'Check launch timing, availability, customer adoption, commercial terms and any financial guidance.'});
-  if(topics.has('Regulation'))channels.push({label:'Regulatory exposure',possibility:'Rules or enforcement could change market access, compliance costs or the ability to sell particular products.',confirm:'Confirm the jurisdiction, affected products, effective dates and the company’s response.'});
-  if(!channels.length)channels.push({label:direct?'Issuer development':'Market or industry connection',possibility:direct?'The report names this issuer. Its financial effect depends on what changes for the business and what the market already expected.':'The report may change broader market or industry expectations; a company-specific effect has not been established.',confirm:'Check the original evidence, company exposure and an observed price reaction before drawing a conclusion.'});
-  return {...m,connection:direct?'Direct issuer mention':m.reason,channels};
- });
+export type HoldingEffect = {
+  clientId: string;
+  client: string;
+  symbol: string;
+  direction: string;
+  connection: string;
+  channels: { label: string; possibility: string; confirm: string }[];
+};
+export function holdingEffects(story: Story): HoldingEffect[] {
+  const unique = [...new Map(story.matches.map((m) => [m.clientId + ':' + m.symbol + ':' + m.direction, m])).values()];
+  return unique.map((m) => {
+    const topics = new Set(story.topics),
+      direct = story.symbols.includes(m.symbol),
+      industry = COMPANIES[m.symbol]?.topics ?? [];
+    const channels: HoldingEffect['channels'] = [];
+    if (topics.has('Oil'))
+      channels.push({
+        label: 'Energy and operating costs',
+        possibility:
+          m.symbol === 'AMZN'
+            ? 'Changes in fuel prices could change delivery and fulfillment costs.'
+            : m.symbol === 'TSLA'
+              ? 'Changes in fuel prices could change the relative cost of driving electric vehicles and influence demand.'
+              : 'Changes in energy costs could affect production costs and customer spending.',
+        confirm: 'Check the reported supply or price change, company cost exposure, hedging and any company guidance.',
+      });
+    if (topics.has('Geopolitics') || topics.has('Trade'))
+      channels.push({
+        label: 'Supply chains and market risk',
+        possibility: industry.includes('Semiconductors')
+          ? 'Disruptions or export restrictions could affect chip production, deliveries or access to customers.'
+          : 'Disruptions, tariffs or sanctions could affect suppliers, deliveries, customer demand or investor risk appetite.',
+        confirm:
+          'Confirm the locations, trade routes, restrictions and customers involved before assuming a company impact.',
+      });
+    if (topics.has('Rates') || topics.has('Credit'))
+      channels.push({
+        label: 'Financing and valuation',
+        possibility:
+          'Changes in interest rates or credit conditions could change financing costs, customer spending and equity valuation assumptions.',
+        confirm:
+          'Check the actual rate or credit change and the company’s borrowing, refinancing needs and demand sensitivity.',
+      });
+    if (topics.has('AI') || topics.has('Cloud') || topics.has('Semiconductors'))
+      channels.push({
+        label: 'Technology demand and competition',
+        possibility: industry.includes('Semiconductors')
+          ? 'AI spending, new chip products or competing platforms could change demand, pricing or market share.'
+          : m.symbol === 'AMZN'
+            ? 'AI adoption and competing cloud products could change cloud demand, investment needs or pricing.'
+            : 'New technology could change product demand, competitive positioning or investment needs.',
+        confirm:
+          'Check which companies and products are named, commercial availability, customer commitments and reported investment plans.',
+      });
+    if (direct && (topics.has('Earnings') || topics.has('Launches')))
+      channels.push({
+        label: topics.has('Earnings') ? 'Reported results and outlook' : 'Product launch or announcement',
+        possibility: topics.has('Earnings')
+          ? 'Changes in reported results or guidance could change expectations for revenue, margins or cash flow.'
+          : 'Product adoption and execution could change revenue opportunities or costs; an announcement alone does not establish a financial effect.',
+        confirm: topics.has('Earnings')
+          ? 'Compare actual results and guidance with prior expectations and check management’s stated reasons.'
+          : 'Check launch timing, availability, customer adoption, commercial terms and any financial guidance.',
+      });
+    if (topics.has('Regulation'))
+      channels.push({
+        label: 'Regulatory exposure',
+        possibility:
+          'Rules or enforcement could change market access, compliance costs or the ability to sell particular products.',
+        confirm: 'Confirm the jurisdiction, affected products, effective dates and the company’s response.',
+      });
+    if (!channels.length)
+      channels.push({
+        label: direct ? 'Issuer development' : 'Market or industry connection',
+        possibility: direct
+          ? 'The report names this issuer. Its financial effect depends on what changes for the business and what the market already expected.'
+          : 'The report may change broader market or industry expectations; a company-specific effect has not been established.',
+        confirm:
+          'Check the original evidence, company exposure and an observed price reaction before drawing a conclusion.',
+      });
+    return { ...m, connection: direct ? 'Direct issuer mention' : m.reason, channels };
+  });
 }

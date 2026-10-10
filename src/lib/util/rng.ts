@@ -24,6 +24,6 @@ export function rngFor(seed: string) {
   return {
     next: r,
     normal: () => Math.sqrt(-2 * Math.log(r() || 1e-9)) * Math.cos(2 * Math.PI * r()),
-    pick: <T,>(arr: readonly T[]) => arr[Math.floor(r() * arr.length)],
+    pick: <T>(arr: readonly T[]) => arr[Math.floor(r() * arr.length)],
   };
 }

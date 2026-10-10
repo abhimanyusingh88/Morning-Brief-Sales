@@ -1,26 +1,35 @@
-import { triggersForClient } from "./match";
-import { scoreTrigger } from "./score";
-import type { Candidate, Snapshot } from "./types";
+import { triggersForClient } from './match';
+import { scoreTrigger } from './score';
+import type { Candidate, Snapshot } from './types';
 
 const MIN_SCORE = 25;
 
-export function urgencyFor(score: number, timing: number): Candidate["urgency"] {
-  if (score >= 62 && timing >= 0.7) return "now";
-  if (score >= 45) return "today";
-  return "this_week";
+export function urgencyFor(score: number, timing: number): Candidate['urgency'] {
+  if (score >= 62 && timing >= 0.7) return 'now';
+  if (score >= 45) return 'today';
+  return 'this_week';
 }
 
 /** All scored candidates, one per (profile, client), before any per-person selection. */
 export function buildCandidates(s: Snapshot): Candidate[] {
   const out: Candidate[] = [];
   for (const client of s.clients.values()) {
-    const scored = triggersForClient(s, client).map((t) => scoreTrigger(s, t)).sort((a, b) => b.score - a.score);
+    const scored = triggersForClient(s, client)
+      .map((t) => scoreTrigger(s, t))
+      .sort((a, b) => b.score - a.score);
     if (!scored.length) continue;
     const [primary, ...others] = scored;
     const bonus = Math.min(6, 0.08 * others.reduce((a, o) => a + o.score, 0));
     const score = Math.min(100, Math.round((primary.score + bonus) * 10) / 10);
     for (const profileId of s.coverage.get(client.id) ?? []) {
-      out.push({ profileId, clientId: client.id, score, urgency: urgencyFor(score, primary.trigger.timing), primary, others });
+      out.push({
+        profileId,
+        clientId: client.id,
+        score,
+        urgency: urgencyFor(score, primary.trigger.timing),
+        primary,
+        others,
+      });
     }
   }
   return out;

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   AlertCircle,
@@ -20,17 +20,17 @@ import {
   ShieldCheck,
   Trash2,
   TrendingUp,
-} from "lucide-react";
-import { useRouter } from "next/navigation";
-import * as React from "react";
-import { Button } from "@/components/ui/button";
-import { RichText } from "@/components/ui/fact";
-import { ErrorState } from "@/components/ui/states";
-import type { AgentMessage, ThreadSummary } from "@/lib/agent/types";
-import { cn } from "@/lib/cn";
-import { DraftCard } from "./draft-card";
-import { GROUPS, groupOf, whenShort } from "./format";
-import { answerToMessage, SendError, streamChat } from "./stream";
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import * as React from 'react';
+import { Button } from '@/components/ui/button';
+import { RichText } from '@/components/ui/fact';
+import { ErrorState } from '@/components/ui/states';
+import type { AgentMessage, ThreadSummary } from '@/lib/agent/types';
+import { cn } from '@/lib/cn';
+import { DraftCard } from './draft-card';
+import { GROUPS, groupOf, whenShort } from './format';
+import { answerToMessage, SendError, streamChat } from './stream';
 
 interface StarterItem {
   icon: React.ReactNode;
@@ -42,27 +42,27 @@ interface StarterItem {
 const CATEGORIZED_STARTERS: StarterItem[] = [
   {
     icon: <PhoneCall size={14} className="text-slate-700" />,
-    category: "Outreach Priority",
-    prompt: "Who should I call first this morning, and why?",
-    tag: "Priority",
+    category: 'Outreach Priority',
+    prompt: 'Who should I call first this morning, and why?',
+    tag: 'Priority',
   },
   {
     icon: <TrendingUp size={14} className="text-slate-700" />,
-    category: "Market Movement",
-    prompt: "What changed overnight for my clients?",
-    tag: "Tape Intel",
+    category: 'Market Movement',
+    prompt: 'What changed overnight for my clients?',
+    tag: 'Tape Intel',
   },
   {
     icon: <AlertCircle size={14} className="text-slate-700" />,
-    category: "Account Risk",
-    prompt: "Which of my clients have gone quiet?",
-    tag: "Retention",
+    category: 'Account Risk',
+    prompt: 'Which of my clients have gone quiet?',
+    tag: 'Retention',
   },
   {
     icon: <Mail size={14} className="text-slate-700" />,
-    category: "Draft Communication",
-    prompt: "Draft a note to my top call regarding recent market moves",
-    tag: "Outreach",
+    category: 'Draft Communication',
+    prompt: 'Draft a note to my top call regarding recent market moves',
+    tag: 'Outreach',
   },
 ];
 
@@ -73,12 +73,12 @@ interface SourceFeed {
 }
 
 const ENTERPRISE_SOURCES: SourceFeed[] = [
-  { name: "Client Book & Coverage Roster", description: "Assigned accounts and contacts", badge: "Synced" },
-  { name: "Positions & Executed Trades", description: "Real-time holdings and history", badge: "Real-Time" },
-  { name: "CRM & Interaction Logs", description: "Notes, calls, and email history", badge: "Synced" },
-  { name: "Pre-Market Tape & Sector Feeds", description: "Live macro moves and earnings", badge: "Streaming" },
-  { name: "Corporate Events & Radar", description: "Earnings and dividend calendar", badge: "Calendar" },
-  { name: "Compliance & Restricted List", description: "Restricted securities list", badge: "Fails-Closed" },
+  { name: 'Client Book & Coverage Roster', description: 'Assigned accounts and contacts', badge: 'Synced' },
+  { name: 'Positions & Executed Trades', description: 'Real-time holdings and history', badge: 'Real-Time' },
+  { name: 'CRM & Interaction Logs', description: 'Notes, calls, and email history', badge: 'Synced' },
+  { name: 'Pre-Market Tape & Sector Feeds', description: 'Live macro moves and earnings', badge: 'Streaming' },
+  { name: 'Corporate Events & Radar', description: 'Earnings and dividend calendar', badge: 'Calendar' },
+  { name: 'Compliance & Restricted List', description: 'Restricted securities list', badge: 'Fails-Closed' },
 ];
 
 interface Props {
@@ -94,19 +94,19 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
   const [threads, setThreads] = React.useState(initialThreads);
   const [activeId, setActiveId] = React.useState<string | null>(initialActive?.thread.id ?? null);
   const [messages, setMessages] = React.useState<AgentMessage[]>(initialActive?.messages ?? []);
-  const [input, setInput] = React.useState(prefill ?? "");
+  const [input, setInput] = React.useState(prefill ?? '');
   const [steps, setSteps] = React.useState<string[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [loadingThread, setLoadingThread] = React.useState(false);
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [copiedThread, setCopiedThread] = React.useState(false);
 
   const endRef = React.useRef<HTMLDivElement>(null);
   const client = clientId ?? initialActive?.thread.clientId ?? undefined;
 
   React.useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+    endRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   }, [messages, steps]);
 
   const open = async (id: string) => {
@@ -118,9 +118,9 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
       const b = await r.json();
       setActiveId(id);
       setMessages(b.messages);
-      window.history.replaceState(null, "", `/agent?t=${id}`);
+      window.history.replaceState(null, '', `/agent?t=${id}`);
     } catch {
-      setError("Could not open that conversation.");
+      setError('Could not open that conversation.');
     } finally {
       setLoadingThread(false);
     }
@@ -130,12 +130,12 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
     setActiveId(null);
     setMessages([]);
     setError(null);
-    setInput("");
-    window.history.replaceState(null, "", "/agent");
+    setInput('');
+    window.history.replaceState(null, '', '/agent');
   };
 
   const remove = async (id: string) => {
-    const r = await fetch(`/api/agent/threads/${id}`, { method: "DELETE" });
+    const r = await fetch(`/api/agent/threads/${id}`, { method: 'DELETE' });
     if (!r.ok) return;
     setThreads((t) => t.filter((x) => x.id !== id));
     if (id === activeId) fresh();
@@ -147,12 +147,12 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
     setBusy(true);
     setError(null);
     setSteps([]);
-    setInput("");
+    setInput('');
     setMessages((m) => [
       ...m,
       {
         id: `local-${Date.now()}`,
-        role: "user",
+        role: 'user',
         content: message,
         facts: {},
         meta: {},
@@ -161,12 +161,12 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
     ]);
     try {
       await streamChat(
-        "/api/agent/chat",
+        '/api/agent/chat',
         { message, threadId: activeId ?? undefined, clientId: activeId ? undefined : client },
         (e) => {
-          if (e.type === "thread") {
+          if (e.type === 'thread') {
             setActiveId(e.data.threadId);
-            window.history.replaceState(null, "", `/agent?t=${e.data.threadId}`);
+            window.history.replaceState(null, '', `/agent?t=${e.data.threadId}`);
             setThreads((t) => [
               {
                 id: e.data.threadId,
@@ -179,13 +179,13 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
               },
               ...t.filter((x) => x.id !== e.data.threadId),
             ]);
-          } else if (e.type === "step") setSteps((s) => [...s, e.label]);
-          else if (e.type === "answer") setMessages((m) => [...m, answerToMessage(e.data)]);
-        }
+          } else if (e.type === 'step') setSteps((s) => [...s, e.label]);
+          else if (e.type === 'answer') setMessages((m) => [...m, answerToMessage(e.data)]);
+        },
       );
       router.refresh();
     } catch (err) {
-      setError(err instanceof SendError ? err.message : "Something went wrong. Please retry.");
+      setError(err instanceof SendError ? err.message : 'Something went wrong. Please retry.');
     } finally {
       setBusy(false);
       setSteps([]);
@@ -195,8 +195,11 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
   const exportConversation = () => {
     if (!messages.length) return;
     const formatted = messages
-      .map((m) => `${m.role === "user" ? "USER" : "AGENT"} (${new Date(m.createdAt).toLocaleTimeString()}):\n${m.content}\n`)
-      .join("\n---\n\n");
+      .map(
+        (m) =>
+          `${m.role === 'user' ? 'USER' : 'AGENT'} (${new Date(m.createdAt).toLocaleTimeString()}):\n${m.content}\n`,
+      )
+      .join('\n---\n\n');
     void navigator.clipboard?.writeText(formatted).then(() => {
       setCopiedThread(true);
       setTimeout(() => setCopiedThread(false), 2000);
@@ -208,7 +211,7 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
         (t) =>
           t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           (t.clientName && t.clientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          (t.preview && t.preview.toLowerCase().includes(searchQuery.toLowerCase()))
+          (t.preview && t.preview.toLowerCase().includes(searchQuery.toLowerCase())),
       )
     : threads;
 
@@ -222,7 +225,10 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
   return (
     <div className="grid h-[calc(100dvh-88px)] min-h-[500px] gap-3.5 lg:grid-cols-[250px_minmax(0,1fr)] 2xl:grid-cols-[250px_minmax(0,1fr)_270px] text-slate-900">
       {/* LEFT SIDEBAR */}
-      <aside aria-label="Conversations Manager" className="flex min-h-0 flex-col rounded-md border border-slate-200 bg-white max-lg:hidden">
+      <aside
+        aria-label="Conversations Manager"
+        className="flex min-h-0 flex-col rounded-md border border-slate-200 bg-white max-lg:hidden"
+      >
         <div className="border-b border-slate-200 p-3 space-y-2.5 bg-slate-50/50">
           <div className="flex items-center justify-between">
             <h2 className="text-[13px] font-bold text-slate-900">Conversations</h2>
@@ -253,9 +259,7 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
 
         <div className="flex-1 overflow-y-auto p-2 space-y-2.5">
           {filteredThreads.length === 0 ? (
-            <div className="px-3 py-6 text-center text-[12px] text-slate-500">
-              No matching conversations
-            </div>
+            <div className="px-3 py-6 text-center text-[12px] text-slate-500">No matching conversations</div>
           ) : (
             grouped.map(({ g, items }) => (
               <div key={g} className="space-y-0.5">
@@ -266,10 +270,10 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
                     <div
                       key={t.id}
                       className={cn(
-                        "group relative flex items-start justify-between rounded transition-colors border",
+                        'group relative flex items-start justify-between rounded transition-colors border',
                         isActive
-                          ? "border-slate-800 bg-slate-100 text-slate-900 font-medium border-l-2 border-l-slate-900"
-                          : "border-transparent text-slate-700 hover:bg-slate-50"
+                          ? 'border-slate-800 bg-slate-100 text-slate-900 font-medium border-l-2 border-l-slate-900'
+                          : 'border-transparent text-slate-700 hover:bg-slate-50',
                       )}
                     >
                       <button
@@ -279,7 +283,9 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
                       >
                         <div className="flex items-center justify-between gap-1">
                           <p className="truncate text-[12.5px] font-semibold text-slate-900">{t.title}</p>
-                          <span className="shrink-0 text-[10px] text-slate-400 font-mono">{whenShort(t.updatedAt)}</span>
+                          <span className="shrink-0 text-[10px] text-slate-400 font-mono">
+                            {whenShort(t.updatedAt)}
+                          </span>
                         </div>
                         {t.clientName ? (
                           <div className="mt-0.5 inline-flex items-center gap-1 text-[10.5px] text-slate-600 font-mono">
@@ -311,15 +317,16 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
       </aside>
 
       {/* CENTER MAIN CANVAS */}
-      <section aria-label="Conversation Viewport" className="flex min-h-0 flex-col rounded-md border border-slate-200 bg-white overflow-hidden">
+      <section
+        aria-label="Conversation Viewport"
+        className="flex min-h-0 flex-col rounded-md border border-slate-200 bg-white overflow-hidden"
+      >
         {/* Top Header - No Chip Icon */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-900 text-white px-4 py-2.5 shrink-0">
           <div>
             <h1 className="text-[13.5px] font-bold text-white tracking-tight">Agent Workspace</h1>
             <p className="text-[11px] text-slate-400">
-              {activeThread
-                ? `Active Thread: ${activeThread.title}`
-                : `Audited sales & client intelligence model`}
+              {activeThread ? `Active Thread: ${activeThread.title}` : `Audited sales & client intelligence model`}
             </p>
           </div>
 
@@ -332,7 +339,7 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
                 className="h-7.5 bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 text-[11.5px] font-medium"
               >
                 {copiedThread ? <Check size={13} className="text-emerald-400" /> : <Download size={13} />}
-                <span>{copiedThread ? "Copied" : "Export"}</span>
+                <span>{copiedThread ? 'Copied' : 'Export'}</span>
               </Button>
             ) : null}
 
@@ -351,7 +358,7 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
         {/* Mobile Dropdown Thread Selector */}
         <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-100 p-2.5 lg:hidden">
           <select
-            value={activeId ?? ""}
+            value={activeId ?? ''}
             disabled={busy || loadingThread}
             onChange={(e) => (e.target.value ? void open(e.target.value) : fresh())}
             className="h-8 min-w-0 flex-1 rounded border border-slate-300 bg-white px-2.5 text-[12.5px] text-slate-800 outline-none"
@@ -378,14 +385,13 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
               <div className="rounded border border-slate-200 bg-white p-4 space-y-2">
                 <h2 className="text-[15px] font-bold text-slate-900">Good morning, {firstName}.</h2>
                 <p className="text-[12.5px] text-slate-600 leading-relaxed">
-                  Query your coverage book, overnight tape moves, or quiet clients. Every numerical figure is dynamically populated from verified enterprise feeds.
+                  Query your coverage book, overnight tape moves, or quiet clients. Every numerical figure is
+                  dynamically populated from verified enterprise feeds.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
-                  Select Workflow
-                </p>
+                <p className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">Select Workflow</p>
 
                 <div className="grid gap-2 sm:grid-cols-2">
                   {CATEGORIZED_STARTERS.map((s, idx) => (
@@ -404,9 +410,7 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
                           {s.tag}
                         </span>
                       </div>
-                      <p className="text-[12.5px] font-semibold text-slate-900 line-clamp-2">
-                        {s.prompt}
-                      </p>
+                      <p className="text-[12.5px] font-semibold text-slate-900 line-clamp-2">{s.prompt}</p>
                     </button>
                   ))}
                 </div>
@@ -415,7 +419,7 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
           ) : (
             /* Render Messages List */
             messages.map((m) =>
-              m.role === "user" ? (
+              m.role === 'user' ? (
                 <div key={m.id} className="flex justify-end">
                   <div className="max-w-[85%] sm:max-w-[75%] space-y-0.5">
                     <div className="rounded-lg bg-slate-900 px-4 py-2.5 text-[13px] leading-relaxed text-white border border-slate-800">
@@ -428,7 +432,7 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
                   <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
                     <span>AGENT</span>
                     <span className="text-[10px] text-slate-400 font-mono ml-auto">
-                      {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
 
@@ -475,12 +479,15 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
                     ) : null}
                   </div>
                 </div>
-              )
+              ),
             )
           )}
 
           {busy ? (
-            <div className="flex items-center gap-2 rounded border border-slate-200 bg-white p-3 text-[12px] text-slate-700 font-medium" aria-live="polite">
+            <div
+              className="flex items-center gap-2 rounded border border-slate-200 bg-white p-3 text-[12px] text-slate-700 font-medium"
+              aria-live="polite"
+            >
               <Loader2 size={15} className="animate-spin text-slate-900 shrink-0" />
               <span>Querying enterprise feeds…</span>
             </div>
@@ -500,7 +507,9 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
         >
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
-              <label htmlFor="agent-input-field" className="sr-only">Ask the agent</label>
+              <label htmlFor="agent-input-field" className="sr-only">
+                Ask the agent
+              </label>
               <textarea
                 id="agent-input-field"
                 rows={1}
@@ -508,12 +517,16 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
                 maxLength={500}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     void send(input);
                   }
                 }}
-                placeholder={client ? "Ask about this client..." : "Ask about your client book, overnight moves, or draft outreach..."}
+                placeholder={
+                  client
+                    ? 'Ask about this client...'
+                    : 'Ask about your client book, overnight moves, or draft outreach...'
+                }
                 className="h-10 min-h-[40px] max-h-24 w-full resize-none rounded border border-slate-300 bg-white px-3 py-2 text-[13px] text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-800"
               />
             </div>
@@ -540,7 +553,10 @@ export function AgentWorkspace({ firstName, initialThreads, initialActive, clien
       </section>
 
       {/* RIGHT SIDEBAR */}
-      <aside aria-label="Enterprise Feeds" className="flex min-h-0 flex-col rounded-md border border-slate-200 bg-white p-3 max-2xl:hidden space-y-3">
+      <aside
+        aria-label="Enterprise Feeds"
+        className="flex min-h-0 flex-col rounded-md border border-slate-200 bg-white p-3 max-2xl:hidden space-y-3"
+      >
         <div className="border-b border-slate-200 pb-2">
           <div className="flex items-center justify-between">
             <h2 className="text-[12.5px] font-bold text-slate-900 flex items-center gap-1.5">

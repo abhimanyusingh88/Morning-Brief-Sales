@@ -1,1 +1,1 @@
-export const MINUS = "−";
+export const MINUS = '−';

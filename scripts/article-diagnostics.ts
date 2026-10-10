@@ -1,2 +1,41 @@
-import {getDb} from '../src/lib/db';import {fetchSource} from '../src/lib/live/fetch';import {extractArticleText} from '../src/lib/live/article-reader';import {verifyDocument} from '../src/lib/live/news';import {businessDate} from '../src/lib/live/time';
-async function main(){const db=await getDb();try{const rows=await db.asService(q=>q<{url:string;title:string;publisher:string}>('select distinct on(publisher) url,title,publisher from live_articles where status=\'verified\' and event_date=$1 order by publisher,published_at desc limit 3',[businessDate()]));for(const a of rows){try{const r=await fetchSource(a.url,AbortSignal.timeout(12000),true);console.log(JSON.stringify({title:a.title,url:a.url,bytes:r.text.length,extracted:extractArticleText(r.text).length,verified:Boolean(verifyDocument(r.text,r.url,['NVDA','TSLA','INTC','MRVL','AMZN'])),bodyField:r.text.indexOf('articleBody'),textBlocks:r.text.includes('text-block'),articleBodyClass:r.text.includes('ArticleBody-articleBody'),bodySample:extractArticleText(r.text).slice(0,750)}));}catch(e){console.log({title:a.title,error:e instanceof Error?e.message:'unavailable'});}}}finally{await db.close();}}main().catch(()=>{process.exitCode=1;});
+import { getDb } from '../src/lib/db';
+import { fetchSource } from '../src/lib/live/fetch';
+import { extractArticleText } from '../src/lib/live/article-reader';
+import { verifyDocument } from '../src/lib/live/news';
+import { businessDate } from '../src/lib/live/time';
+async function main() {
+  const db = await getDb();
+  try {
+    const rows = await db.asService((q) =>
+      q<{ url: string; title: string; publisher: string }>(
+        "select distinct on(publisher) url,title,publisher from live_articles where status='verified' and event_date=$1 order by publisher,published_at desc limit 3",
+        [businessDate()],
+      ),
+    );
+    for (const a of rows) {
+      try {
+        const r = await fetchSource(a.url, AbortSignal.timeout(12000), true);
+        console.log(
+          JSON.stringify({
+            title: a.title,
+            url: a.url,
+            bytes: r.text.length,
+            extracted: extractArticleText(r.text).length,
+            verified: Boolean(verifyDocument(r.text, r.url, ['NVDA', 'TSLA', 'INTC', 'MRVL', 'AMZN'])),
+            bodyField: r.text.indexOf('articleBody'),
+            textBlocks: r.text.includes('text-block'),
+            articleBodyClass: r.text.includes('ArticleBody-articleBody'),
+            bodySample: extractArticleText(r.text).slice(0, 750),
+          }),
+        );
+      } catch (e) {
+        console.log({ title: a.title, error: e instanceof Error ? e.message : 'unavailable' });
+      }
+    }
+  } finally {
+    await db.close();
+  }
+}
+main().catch(() => {
+  process.exitCode = 1;
+});

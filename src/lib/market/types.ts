@@ -1,10 +1,10 @@
-export type MoveUnit = "pct" | "bp" | "level";
+export type MoveUnit = 'pct' | 'bp' | 'level';
 
 export interface InstrumentRef {
   id: string;
   symbol: string;
   name: string;
-  assetClass: "equity" | "rates" | "credit" | "fx" | "commodity" | "index" | "vol";
+  assetClass: 'equity' | 'rates' | 'credit' | 'fx' | 'commodity' | 'index' | 'vol';
   sector: string | null;
   unit: MoveUnit;
   decimals: number;

@@ -1,17 +1,17 @@
-import type { Metadata } from "next";
-import "@fontsource-variable/inter";
-import "@fontsource-variable/inter-tight";
-import "@fontsource-variable/source-serif-4";
-import "@fontsource-variable/jetbrains-mono";
-import "./globals.css";
+import type { Metadata } from 'next';
+import '@fontsource-variable/inter';
+import '@fontsource-variable/inter-tight';
+import '@fontsource-variable/source-serif-4';
+import '@fontsource-variable/jetbrains-mono';
+import './globals.css';
 
 export const metadata: Metadata = {
-  title: { default: "Morning Brief", template: "%s · Morning Brief" },
-  description: "A personal desk agent: who to call today, why now, and what to say.",
+  title: { default: 'Morning Brief', template: '%s · Morning Brief' },
+  description: 'A personal desk agent: who to call today, why now, and what to say.',
   icons: {
-    icon: "/Morning Brief Sunrise Logo.png",
-    shortcut: "/Morning Brief Sunrise Logo.png",
-    apple: "/Morning Brief Sunrise Logo.png",
+    icon: '/Morning Brief Sunrise Logo.png',
+    shortcut: '/Morning Brief Sunrise Logo.png',
+    apple: '/Morning Brief Sunrise Logo.png',
   },
 };
 
