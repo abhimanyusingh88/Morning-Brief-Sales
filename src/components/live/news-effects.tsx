@@ -32,7 +32,7 @@ function EffectsPanel({story}:{story:Story}){
  }
  const matched=[...new Map(story.matches.map(m=>[m.clientId+':'+m.symbol+':'+m.direction,m])).values()];
  return <Dialog.Root open={open} onOpenChange={value=>{setOpen(value);if(value&&!analysis&&!loading)void load();}}>
-  <Dialog.Trigger asChild><button type="button" className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line-strong bg-surface px-2.5 text-[12px] font-semibold text-ink shadow-[0_1px_0_rgba(14,22,39,0.04)] transition-colors hover:border-navy hover:bg-sunken" aria-label={'Potential client effects: '+story.title}><Activity size={13} className="text-brand"/>Effects</button></Dialog.Trigger>
+  <Dialog.Trigger asChild><button type="button" className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md border border-line-strong bg-surface px-2.5 text-[12px] font-semibold text-ink shadow-[0_1px_0_rgba(14,22,39,0.04)] transition-colors hover:border-navy hover:bg-sunken" aria-label={'Potential client effects: '+story.title}><Activity size={13} className="text-brand"/>Effects</button></Dialog.Trigger>
   <Dialog.Portal>
    <Dialog.Overlay className="fixed inset-0 z-50 bg-navy/60 backdrop-blur-sm"/>
    <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[90dvh] w-[calc(100%-24px)] max-w-[1000px] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-line bg-surface shadow-pop focus:outline-none">

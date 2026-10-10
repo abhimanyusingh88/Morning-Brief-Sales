@@ -56,7 +56,8 @@ async function writeWithModel(articles:Article[],metrics:Metric[],now:Date,signa
 export async function latestDesk(q:Q,date:string):Promise<DeskNote|null>{const [r]=await q('select payload from live_desk_notes where business_date=$1 order by created_at desc limit 1',[date]);if(!r)return null;const d=r.payload as DeskNote;return {...d,keyEvents:d.keyEvents.map(e=>({...e,text:tidySigns(e.text)})),wrap:d.wrap.map(tidySigns),sections:d.sections.map(x=>({...x,text:tidySigns(x.text)}))};}
 async function reserve(q:Q,date:string):Promise<boolean>{if(!process.env.OPENAI_API_KEY)return false;const raw=Number(process.env.NEWS_DAILY_CALL_LIMIT||48);const cap=Math.max(1,Math.min(96,Number.isFinite(raw)?raw:48));return (await q('insert into live_model_budget(day,calls) values($1,1) on conflict(day) do update set calls=live_model_budget.calls+1 where live_model_budget.calls<$2 returning calls',[date,cap])).length>0;}
 /** Refreshes the market-wide desk note at most every thirty minutes, and only when the evidence changed. */
-export async function prepareDesk(db:Db,now=new Date()):Promise<DeskNote|null>{
+/** modelMs bounds the model call; a short interactive refresh keeps a template note and a full run upgrades it. */
+export async function prepareDesk(db:Db,now=new Date(),modelMs=70000):Promise<DeskNote|null>{
  const date=businessDate(now);
  const {articles,metrics,last}=await db.asService(async q=>{
   const [last]=await q('select fingerprint,created_at,payload from live_desk_notes where business_date=$1 order by created_at desc limit 1',[date]);
@@ -67,10 +68,13 @@ export async function prepareDesk(db:Db,now=new Date()):Promise<DeskNote|null>{
   return {articles,metrics,last};
  });
  const fingerprint=createHash('sha256').update(JSON.stringify([articles.map(a=>a.id).sort(),metrics.map(m=>[m.key,m.value])])).digest('hex');
- if(last&&(last.fingerprint===fingerprint||now.getTime()-Date.parse(iso(last.created_at))<REFRESH_MS&&(last.payload as DeskNote).method==='model'))return last.payload as DeskNote;
+ if(last&&(last.fingerprint===fingerprint&&((last.payload as DeskNote).method==='model'||modelMs<60000)||now.getTime()-Date.parse(iso(last.created_at))<REFRESH_MS&&(last.payload as DeskNote).method==='model'))return last.payload as DeskNote;
  if(!articles.length&&!metrics.some(m=>m.value!==null))return null;
  let note:DeskNote|null=null;
- if(await db.asService(q=>reserve(q,date)))try{note=await writeWithModel(articles,metrics,now,AbortSignal.timeout(70000));}catch(e){console.warn('[desk] model_unavailable',(e as {status?:number}).status??'');}
+ // Too little time for the model (a short interactive refresh) is not worth a reserved call.
+ if(modelMs>=20000&&await db.asService(q=>reserve(q,date)))try{note=await writeWithModel(articles,metrics,now,AbortSignal.timeout(modelMs));}catch(e){console.warn('[desk] model_unavailable',(e as {status?:number}).status??'');}
+ // A short refresh never downgrades the day's model-written note to a template; a full run writes the next one.
+ if(!note&&modelMs<60000){const [m]=await db.asService(q=>q("select payload from live_desk_notes where business_date=$1 and payload->>'method'='model' order by created_at desc limit 1",[date]));if(m){note=m.payload as DeskNote;await db.asService(q=>q('insert into live_desk_notes(business_date,fingerprint,payload) values($1,$2,$3::jsonb)',[date,'kept:'+fingerprint,JSON.stringify(note)]));return note;}}
  note??=templateDesk(articles,metrics,now);
  await db.asService(q=>q('insert into live_desk_notes(business_date,fingerprint,payload) values($1,$2,$3::jsonb)',[date,fingerprint,JSON.stringify(note)]));
  return note;

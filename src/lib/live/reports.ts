@@ -59,10 +59,15 @@ export async function makeReport(db:Db,profileId:string,clientId:string|null,now
  return {profileId,salesperson:String(p.full_name),clientId,clientName:clientId?h[0].client:'All my clients',businessDate:date,cutoff:now.toISOString(),coverageHash:hash(all),holdings:h,metrics:metricRows(rows,date),articles:matchArticles(articles,h,preferences,now.getTime()),desk:await latestDesk(q,date),sources:checks.map(r=>({key:String(r.source_key),at:iso(r.checked_at),ok:Boolean(r.succeeded),accepted:Number(r.accepted),detail:String(r.detail)})),preferences,coverage:[...new Set(h.map(x=>x.symbol))].sort()};
  });
 }
-export async function publishReports(db:Db,now=new Date()):Promise<number>{
- await prepareDesk(db,now).catch(()=>console.warn('[desk] note_unavailable'));
- const people=await db.asService(q=>q<{id:string}>('select id from profiles where is_active and role=\'sales\' and exists(select 1 from live_coverage c join live_clients l on l.id=c.client_id where c.profile_id=profiles.id and l.active)'));let count=0;
- for(const p of people){const coverage=await getCoverage(db,p.id);for(const clientId of [null,...coverage.clients.map(x=>x.id)]){const report=await makeReport(db,p.id,clientId,now);const fingerprint=hash({...report,cutoff:undefined});await db.asService(async q=>{const [active]=await q('select 1 from profiles where id=$1 and is_active',[p.id]);if(!active)throw new Error('PROFILE_UNAVAILABLE');await q('insert into live_reports(profile_id,scope_client,input_client_ids,business_date,cutoff,coverage_hash,fingerprint,payload) values($1,$2,$3,$4,$5,$6,$7,$8::jsonb) on conflict(profile_id,fingerprint) do nothing',[p.id,clientId,[...new Set(report.holdings.map(x=>x.clientId))],report.businessDate,report.cutoff,report.coverageHash,fingerprint,JSON.stringify(report)]);});count++;}}
+/**
+ * Publishes every sales person's views, or one person's for an interactive refresh. Scopes are built four at a time;
+ * deskMs bounds the desk model call so a refresh finishes inside its function limit.
+ */
+export async function publishReports(db:Db,now=new Date(),opts:{profileId?:string;deskMs?:number}={}):Promise<number>{
+ await prepareDesk(db,now,opts.deskMs).catch(()=>console.warn('[desk] note_unavailable'));
+ const people=await db.asService(q=>q<{id:string}>('select id from profiles where is_active and role=\'sales\' and ($1::uuid is null or id=$1::uuid) and exists(select 1 from live_coverage c join live_clients l on l.id=c.client_id where c.profile_id=profiles.id and l.active)',[opts.profileId??null]));let count=0;
+ const publish=async(profileId:string,clientId:string|null)=>{const report=await makeReport(db,profileId,clientId,now);const fingerprint=hash({...report,cutoff:undefined});await db.asService(async q=>{const [active]=await q('select 1 from profiles where id=$1 and is_active',[profileId]);if(!active)throw new Error('PROFILE_UNAVAILABLE');await q('insert into live_reports(profile_id,scope_client,input_client_ids,business_date,cutoff,coverage_hash,fingerprint,payload) values($1,$2,$3,$4,$5,$6,$7,$8::jsonb) on conflict(profile_id,fingerprint) do nothing',[profileId,clientId,[...new Set(report.holdings.map(x=>x.clientId))],report.businessDate,report.cutoff,report.coverageHash,fingerprint,JSON.stringify(report)]);});count++;};
+ for(const p of people){const coverage=await getCoverage(db,p.id),scopes=[null,...coverage.clients.map(x=>x.id)];for(let i=0;i<scopes.length;i+=4)await Promise.all(scopes.slice(i,i+4).map(c=>publish(p.id,c)));}
  return count;
 }
 export async function getReport(db:Db,profileId:string,clientId:string|null,reportId?:string,now=new Date()):Promise<Report|null>{

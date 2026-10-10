@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
-import { ArrowUp, Check, ChevronDown, Copy, ExternalLink, MessageSquare, Plus, Search, Trash2, Users, X } from 'lucide-react';
+import { ArrowUp, CalendarDays, Check, ChevronDown, Copy, ExternalLink, GitCompare, MessageSquare, Plus, Search, Trash2, Users, X } from 'lucide-react';
+import { Select } from '@/components/ui/select';
+import { displayDay } from '@/lib/live/time';
 import type { Client, Report, Filters } from '@/lib/live/types';
 import type { Answer } from '@/lib/live/assistant';
 import type { ThreadMessage, ThreadSummary } from '@/lib/live/threads';
@@ -138,7 +140,11 @@ function Composer({ value, onChange, onSend, busy, picker, inputRef, large }: { 
   );
 }
 
-export function BriefAssistant({ report, filters, clients, archived = false }: { report: Report; filters: Filters; clients: Client[]; archived?: boolean }) {
+export function BriefAssistant({ report, filters, clients, archived = false, days = [], today: liveDay }: { report: Report; filters: Filters; clients: Client[]; archived?: boolean; days?: string[]; today?: string }) {
+  // Any other day with a published brief can be compared with this one; a past brief can also compare with today.
+  const [compareDay, setCompareDay] = useState('');
+  const compareOptions = [...new Set([...(archived && liveDay ? [liveDay] : []), ...days])].filter((d) => d !== report.businessDate);
+  const dayLabel = (archived ? 'Archived brief' : 'Today') + ' · ' + displayDay(report.businessDate);
   const [picked, setPicked] = useState<string[]>(report.clientId ? [report.clientId] : []);
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState('');
@@ -153,7 +159,7 @@ export function BriefAssistant({ report, filters, clients, archived = false }: {
   const input = useRef<HTMLTextAreaElement>(null);
   const conversation = useRef<HTMLDivElement>(null);
   const pickedName = !picked.length ? 'All my clients' : picked.length === 1 ? clients.find((c) => c.id === picked[0])?.name ?? report.clientName : picked.length + ' clients';
-  const scope = [pickedName, filters.topic, filters.symbol, filters.q && '“' + filters.q + '”'].filter(Boolean).join(' · ');
+  const scope = [compareDay && 'comparing with ' + displayDay(compareDay), pickedName, filters.topic, filters.symbol, filters.q && '“' + filters.q + '”'].filter(Boolean).join(' · ');
 
   const loadThreads = useCallback(async () => {
     // Chats are listed per brief day: each conversation belongs to the day of the brief it was asked about.
@@ -187,7 +193,7 @@ export function BriefAssistant({ report, filters, clients, archived = false }: {
     setMessages((m) => [...m, { role: 'user', content: text.trim(), at: new Date().toISOString() }]);
     setQuestion('');
     try {
-      const response = await fetch('/api/live/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ report: report.id, client: report.clientId, question: text.trim(), filters, thread: threadId, clients: picked.length ? picked : undefined }), signal: AbortSignal.timeout(70000) });
+      const response = await fetch('/api/live/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ report: report.id, client: report.clientId, question: text.trim(), filters, thread: threadId, clients: picked.length ? picked : undefined, compare: compareDay || null }), signal: AbortSignal.timeout(70000) });
       let result: { status: number; body: Record<string, unknown> } | null = null;
       if ((response.headers.get('content-type') ?? '').includes('text/event-stream') && response.body) {
         // Server-sent events: phase, thinking (reasoning summary deltas), result.
@@ -256,10 +262,11 @@ export function BriefAssistant({ report, filters, clients, archived = false }: {
           <section className="flex min-w-0 flex-1 flex-col">
             <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-6 py-3">
               <div className="min-w-0">
-                <Dialog.Title className="truncate text-[15px] font-semibold text-ink">Desk Analyst <span className="font-normal text-muted">/ {title}</span></Dialog.Title>
+                <Dialog.Title className="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-ink"><span className="truncate">Desk Analyst <span className="font-normal text-muted">/ {title}</span></span><span className={'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ' + (archived ? 'bg-sunken text-ink-2' : 'bg-brand-50 text-brand')}><CalendarDays size={11} />{dayLabel}</span></Dialog.Title>
                 <p id="assistant-context" className="truncate text-[11.5px] text-muted">{scope}</p>
               </div>
               <div className="flex items-center gap-2">
+                {compareOptions.length ? <Select label="Compare with" value={compareDay} onChange={setCompareDay} disabled={busy} icon={<GitCompare size={13} />} className="w-52" align="end" options={[{ value: '', label: 'No comparison' }, ...compareOptions.map((d) => ({ value: d, label: 'Compare with ' + (d === liveDay ? 'today' : displayDay(d)) }))]} /> : null}
                 <button type="button" onClick={newChat} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-line-strong px-3 text-[12.5px] font-medium text-ink transition-colors hover:bg-sunken md:hidden"><Plus size={14} />New</button>
                 <Dialog.Close asChild><button type="button" aria-label="Close the desk analyst" className="flex h-8 w-8 items-center justify-center rounded-md text-muted transition-colors hover:bg-sunken hover:text-ink"><X size={17} /></button></Dialog.Close>
               </div>
@@ -272,7 +279,7 @@ export function BriefAssistant({ report, filters, clients, archived = false }: {
                   <p className="mb-6 mt-1.5 text-center text-[13px] text-muted">Answers use the brief&apos;s verified evidence, your clients&apos; positions and live prices.</p>
                   <Composer value={question} onChange={setQuestion} onSend={() => send(question)} busy={busy} picker={<ScopePicker clients={clients} selected={picked} onChange={setPicked} />} inputRef={input} large />
                   {error ? <p role="alert" className="mt-3 text-center text-[12px] text-down">{error}</p> : null}
-                  <div className="mt-5 flex flex-wrap justify-center gap-2">{STARTERS.map((s) => <button key={s} type="button" onClick={() => send(s)} disabled={busy} className="rounded-full border border-line bg-surface px-3 py-1.5 text-[12px] text-ink-2 transition-colors hover:border-ink-2 hover:text-ink disabled:opacity-50">{s}</button>)}</div>
+                  <div className="mt-5 flex flex-wrap justify-center gap-2">{(compareDay ? [`How has the market changed versus ${displayDay(compareDay)}?`, `What changed for my positions since ${displayDay(compareDay)}?`, 'Which stories are new and which are continuing?', 'Compare rates, oil and volatility across the two days'] : STARTERS).map((s) => <button key={s} type="button" onClick={() => send(s)} disabled={busy} className="rounded-full border border-line bg-surface px-3 py-1.5 text-[12px] text-ink-2 transition-colors hover:border-ink-2 hover:text-ink disabled:opacity-50">{s}</button>)}</div>
                   <p className="mt-6 text-center text-[11px] text-muted">Figures are substituted from sourced data and verified. Drafts are never sent automatically.</p>
                 </div>
               </div>

@@ -7,6 +7,7 @@ import { filterStories,formatMetric,metricChange,tidySigns } from './presentatio
 import { COMPANIES } from './classify';
 import { stamp,displayDay } from './time';
 import { INSTRUMENT_NAMES } from './desk';
+import { compareReports,comparisonContext } from './compare';
 export type Answer={answer:string;sources:{id:string;title:string;url:string;publishedAt:string}[];method:'facts'|'model';notice?:string};
 export type LiveMarket={movers:Series[];calendar:Calendar|null};
 const sources=(stories:Story[])=>stories.map(a=>({id:a.id,title:a.title,url:a.url,publishedAt:a.publishedAt}));
@@ -14,7 +15,7 @@ const n=(x:string)=>{const v=Number(x);return Number.isFinite(v)?v.toLocaleStrin
 const pct=(v:number)=>(v>0?'+':'')+v.toFixed(2)+'%';
 
 // ---------------------------------------------------------------- 1. guard + intent routing (deterministic, no model cost)
-export type Intent='summary'|'exposure'|'talking_points'|'catalysts'|'movers'|'explain'|'draft'|'scenario'|'general';
+export type Intent='compare'|'summary'|'exposure'|'talking_points'|'catalysts'|'movers'|'explain'|'draft'|'scenario'|'general';
 export function routeIntent(q:string):Intent{
  const s=q.toLowerCase();
  if(/\b(draft|write|compose)\b.*\b(note|email|message|blurb|update)\b|\b(send|email|forward)\b.*\b(client|pm|trader|them)\b/.test(s))return 'draft';
@@ -28,6 +29,7 @@ export function routeIntent(q:string):Intent{
  return 'general';
 }
 const TASK:Record<Intent,string>={
+ compare:'Compare the current brief with the base day in the comparison evidence, as a desk strategist would at the morning meeting: the bottom line on how the market picture changed, the largest level-to-level moves and what drove them per cited stories, how the news themes shifted, what changed for each affected held position (LONG vs SHORT), which stories are continuing versus new, and what to watch next. Be specific; no generic commentary.',
  summary:'Give the morning picture for THIS book: lead with the single most important development, then the three to five headlines that matter most for the held names, each tied to the client/position it touches.',
  exposure:'Rank the positions by how directly today\'s evidence touches them (direct issuer news > peer read-across > sector > macro). For each, state the channel and whether the reported development is favourable or adverse for a LONG vs a SHORT, as a consideration, not a forecast.',
  talking_points:'Write call-ready talking points a salesperson can say to a buy-side PM or trader: crisp, specific, each anchored to a cited story or market fact, plus two smart questions to ask the client.',
@@ -130,14 +132,17 @@ Rules you never break:
 
 Format (plain text, light markdown): first line is the bottom line in **bold**. Then short sections using "## " headings (e.g. ## What happened, ## Book impact, ## Talking points, ## Watch). Use "• " bullets, each one or two lines. Bold tickers and client names. Keep it under about two hundred and fifty words unless asked for a draft.`;
 export type ThinkingEvent={type:'phase';label:string}|{type:'thinking';delta:string};
-export async function answerWithModel(report:Report,filters:Filters,question:string,history:{role:'user'|'assistant';content:string}[],live?:LiveMarket,onEvent?:(e:ThinkingEvent)=>void):Promise<Answer|null>{
+export async function answerWithModel(report:Report,filters:Filters,question:string,history:{role:'user'|'assistant';content:string}[],live?:LiveMarket,onEvent?:(e:ThinkingEvent)=>void,compare?:Report):Promise<Answer|null>{
  if(!process.env.OPENAI_API_KEY)return null;
- const intent=routeIntent(question);
- const {facts,relevant,context}=assistantContext(report,filters,question,live);
+ const intent=compare?'compare':routeIntent(question);
+ const {facts,relevant:own,context}=assistantContext(report,filters,question,live);
+ // A comparison adds the base day as tokenised evidence; its stories become citable alongside today's.
+ const cmp=compare?comparisonContext(compareReports(report,compare),facts):null;
+ const relevant=cmp?[...own,...cmp.stories.filter(s=>!own.some(r=>r.id===s.id))]:own,evidence=cmp?{...context,comparison:cmp.context}:context;
  const client=new OpenAI({apiKey:process.env.OPENAI_API_KEY,maxRetries:0,timeout:50000});
  const schema={type:'json_schema' as const,name:'analyst_answer',strict:true,schema:{type:'object',properties:{answer_template:{type:'string'},citation_ids:{type:'array',items:{type:'string'}}},required:['answer_template','citation_ids'],additionalProperties:false}};
  const effort=(process.env.ASSISTANT_REASONING==='low'?'low':'medium') as 'low'|'medium';
- const input:OpenAI.Responses.ResponseInput=[{role:'system',content:PERSONA},{role:'user',content:JSON.stringify({task:TASK[intent],intent,evidence:context,conversation:history.slice(-6),question})}];
+ const input:OpenAI.Responses.ResponseInput=[{role:'system',content:PERSONA},{role:'user',content:JSON.stringify({task:TASK[intent],intent,evidence,conversation:history.slice(-6),question})}];
  const deadline=Date.now()+52000;
  for(let attempt=0;attempt<2&&Date.now()<deadline-12000;attempt++){
   onEvent?.({type:'phase',label:attempt?'Re-checking figures against sources':'Reasoning over the evidence'});

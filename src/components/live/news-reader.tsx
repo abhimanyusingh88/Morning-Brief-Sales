@@ -4,7 +4,7 @@ import { NewsEffects } from './news-effects';
 import { useReportContext } from './report-context';
 import type { ReadingBrief } from '@/lib/live/article-reader';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ExternalLink,X,ArrowUpRight,AlignLeft,LoaderCircle } from 'lucide-react';
+import { ExternalLink,X,ArrowUpRight,AlignLeft,LoaderCircle,RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Figures } from '@/components/ui/figures';
 import type { Story } from '@/lib/live/types';
@@ -21,7 +21,7 @@ async function loadReading(body:unknown,signal:AbortSignal):Promise<ReadingBrief
  throw new Error('This article is still preparing. Try again shortly.');
 }
 export function NewsReader({story,children}:{story:Story;children:React.ReactNode}){
- const context=useReportContext(),[open,setOpen]=useState(false),[reading,setReading]=useState<ReadingBrief|null>(null),[showSummary,setShowSummary]=useState(false),[loading,setLoading]=useState(false),[summarizing,setSummarizing]=useState(false),[error,setError]=useState('');
+ const context=useReportContext(),[open,setOpen]=useState(false),[reading,setReading]=useState<ReadingBrief|null>(null),[showSummary,setShowSummary]=useState(false),[loading,setLoading]=useState(false),[summarizing,setSummarizing]=useState(false),[retrying,setRetrying]=useState(false),[error,setError]=useState('');
  const summaryRequest=useRef<AbortController|null>(null);
  useEffect(()=>{
   if(!open){summaryRequest.current?.abort();return;}
@@ -33,6 +33,13 @@ export function NewsReader({story,children}:{story:Story;children:React.ReactNod
    .finally(()=>{if(active)setLoading(false);});
   return()=>{active=false;controller.abort();};
  },[open,context,story.id,reading]);
+ // Downloads the article again and replaces the stored copy; used when only the excerpt could be read.
+ async function retry(){
+  if(!context)return;setRetrying(true);setError('');
+  try{setReading(await loadReading({report:context.reportId,client:context.clientId,article:story.id,retry:true},AbortSignal.timeout(90000)));}
+  catch(e){setError(e instanceof Error&&e.name!=='TimeoutError'?e.message:'The article could not be downloaded. The publisher content below remains available.');}
+  finally{setRetrying(false);}
+ }
  async function summarize(){
   setShowSummary(true);
   if(reading?.summaryPoints?.length||!context)return;
@@ -60,6 +67,7 @@ export function NewsReader({story,children}:{story:Story;children:React.ReactNod
        <Dialog.Title className="serif mt-4 max-w-[860px] text-[26px] font-semibold leading-[1.2] tracking-[-0.01em] text-ink sm:text-[34px]">{story.title}</Dialog.Title>
        <Dialog.Description id="news-reader-description" className="mt-3 text-xs leading-relaxed text-muted">Published {stamp(story.publishedAt)} · Source checked {stamp(story.verifiedAt)}</Dialog.Description>
        {loading?<p role="status" className="mt-5 flex items-center gap-2 text-xs text-muted"><LoaderCircle size={13} className="animate-spin"/>Loading available article content…</p>:null}
+       {!loading&&(error||reading&&!full&&reading.basis!=='article')?<div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted"><span>{error?'The article did not download.':'Only the publisher summary was downloaded.'}</span><Button size="sm" variant="secondary" onClick={retry} disabled={retrying}><RotateCw size={12} className={retrying?'animate-spin':''}/>{retrying?'Downloading…':'Retry download'}</Button></div>:null}
        {error?<p role="alert" className="mt-4 rounded-lg bg-sunken px-3 py-2 text-xs leading-relaxed text-muted">{error}</p>:null}
        {showSummary?<section id={'summary-'+story.id} className="mt-6 rounded-xl border border-brand-100 bg-brand-50 p-5" aria-label="Article key points">
         <h3 className="text-sm font-semibold text-brand">Key points explained</h3>

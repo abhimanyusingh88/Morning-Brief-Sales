@@ -17,7 +17,7 @@ export function parseChart(text:string,symbol:string,label:string,url:string):Se
 }
 export async function getSeries(symbol:string,label=symbol,range:'1d'|'5d'='1d',interval:'5m'|'15m'|'30m'='5m'):Promise<Series|null>{
  const url='https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(symbol)+'?range='+range+'&interval='+interval+'&includePrePost=true';
- try{return await cached('s:'+url,4*60000,async()=>{const r=await fetchSource(url,AbortSignal.timeout(7000));return parseChart(r.text,symbol,label,url);});}catch{return null;}
+ try{return await cached('s:'+url,60000,async()=>{const r=await fetchSource(url,AbortSignal.timeout(7000));return parseChart(r.text,symbol,label,url);});}catch{return null;}
 }
 /** One past ET business day's intraday series (backfill). Last value and time come from that day's final point. */
 export async function getSeriesForDay(symbol:string,label:string,day:string,interval:'5m'|'15m'='5m'):Promise<Series|null>{

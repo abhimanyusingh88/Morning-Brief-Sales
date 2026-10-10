@@ -94,14 +94,23 @@ async function summarize(article:Article,brief:ReadingBrief,db:Db):Promise<Readi
   return points?{...brief,summaryPoints:points,summaryStatus:brief.basis==='full'?'ready':'limited'}:{...brief,summaryStatus:'unavailable'};
  }catch{return {...brief,summaryStatus:'unavailable'};}
 }
-export async function getReadingBrief(db:Db,article:Article,wantSummary=false):Promise<ReadingBrief|null>{
- const [cached]=await db.asService(q=>q('select payload,updated_at from live_article_readers where article_id=$1 and evidence_hash=$2',[article.id,article.evidenceHash]));
+/**
+ * The stored reading of an article. Text is downloaded once and reused, including after the story is re-verified;
+ * `retry` (the reader's Retry button) downloads it again and replaces what is stored for the article.
+ */
+export async function getReadingBrief(db:Db,article:Article,wantSummary=false,retry=false):Promise<ReadingBrief|null>{
+ let [cached]=await db.asService(q=>q('select payload,updated_at from live_article_readers where article_id=$1 and evidence_hash=$2 and payload is not null',[article.id,article.evidenceHash]));
+ // A re-verified story keeps the same page: carry its downloaded text over to the new evidence version.
+ if(!cached){[cached]=await db.asService(q=>q("select payload,updated_at from live_article_readers where article_id=$1 and payload is not null and payload->>'basis'<>'excerpt' order by updated_at desc limit 1",[article.id]));
+  if(cached)await db.asService(q=>q('insert into live_article_readers(article_id,evidence_hash,payload,updated_at) values($1,$2,$3::jsonb,$4) on conflict(article_id,evidence_hash) do update set payload=excluded.payload,updated_at=excluded.updated_at where live_article_readers.payload is null',[article.id,article.evidenceHash,JSON.stringify(cached.payload),cached.updated_at]));}
  const old=cached?.payload as ReadingBrief|undefined;
  const authorized=fullTextAuthorized(article.url);
- // Reuse what was read: full and alternate-source text until the evidence changes; a failed read is retried after 30 minutes.
+ // A retry just after the last download returns that result rather than hitting the publisher again.
+ const justRead=old&&Date.now()-new Date(String(cached.updated_at)).getTime()<20000;
+ // Reuse what was read: full and alternate-source text until a retry; a failed read is retried after 30 minutes.
  const usable=old&&(authorized?true:old.basis!=='full');
  const age=old?Date.now()-new Date(old.fetchedAt).getTime():Infinity;
- const fresh=usable&&(old.basis==='excerpt'?age<30*60*1000||!authorized:true);
+ const fresh=usable&&(retry?Boolean(justRead):old.basis==='excerpt'?age<30*60*1000||!authorized:true);
  if(fresh&&(!wantSummary||old.summaryPoints?.length||old.summaryStatus==='unavailable'&&Date.now()-new Date(String(cached.updated_at)).getTime()<60000))return old;
  const token=randomUUID();
  const acquired=await db.asService(q=>q("insert into live_article_readers(article_id,evidence_hash,lease_token,lease_until) values($1,$2,$3,now()+interval '90 seconds') on conflict(article_id,evidence_hash) do update set lease_token=excluded.lease_token,lease_until=excluded.lease_until where live_article_readers.lease_until is null or live_article_readers.lease_until<now() returning article_id",[article.id,article.evidenceHash,token]));
@@ -109,6 +118,8 @@ export async function getReadingBrief(db:Db,article:Article,wantSummary=false):P
  const [current]=await db.asService(q=>q('select payload from live_article_readers where article_id=$1 and evidence_hash=$2',[article.id,article.evidenceHash]));
  const latest=current?.payload as ReadingBrief|undefined;
  let brief=fresh?old!:await readSource(article,db);
+ // A retry that only reaches the excerpt never replaces text downloaded earlier that may still be shown.
+ if(!fresh&&usable&&old.basis!=='excerpt'&&brief.basis==='excerpt')brief=old;
  if(!fresh&&usable&&JSON.stringify(brief.sections)===JSON.stringify(old.sections))brief={...brief,summaryPoints:old.summaryPoints,summaryStatus:old.summaryStatus};
  if(fresh&&latest?.basis===brief.basis)brief=latest;
  if(wantSummary&&!brief.summaryPoints?.length)brief=await summarize(article,brief,db);
