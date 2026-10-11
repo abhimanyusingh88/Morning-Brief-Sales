@@ -15,7 +15,7 @@ export const NAV: { group: string; items: NavItem[] }[] = [
       { href: '/clients', label: 'Client coverage', icon: Users, roles },
     ],
   },
-  { group: 'Account', items: [{ href: '/setup', label: 'My interests', icon: SlidersHorizontal, roles }] },
+  { group: 'Account', items: [{ href: '/setup', label: 'Brief setup', icon: SlidersHorizontal, roles }] },
 ];
 export const HOME: Record<Role, string> = {
   sales: '/brief',

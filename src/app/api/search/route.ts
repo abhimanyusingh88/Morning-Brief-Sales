@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const pages = [
     { label: 'Daily market brief', href: '/brief' },
     { label: 'Client coverage', href: '/clients' },
-    { label: 'My interests', href: '/setup' },
+    { label: 'Brief setup', href: '/setup' },
   ]
     .filter((p) => p.label.toLowerCase().includes(term.toLowerCase()))
     .map((p) => ({ ...p, kind: 'page' }));
