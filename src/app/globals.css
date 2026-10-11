@@ -406,7 +406,7 @@ main,
 /* Indeterminate progress: a clear sign that data is on its way while a view loads or sources refresh. */
 .loading-bar {
   position: relative;
-  height: 3px;
+  height: 4px;
   overflow: hidden;
   background: var(--color-sunken);
 }
@@ -414,17 +414,17 @@ main,
   content: '';
   position: absolute;
   inset: 0 auto 0 0;
-  width: 35%;
-  border-radius: 3px;
-  background: var(--color-brand);
-  animation: loading-slide 1.1s ease-in-out infinite;
+  width: 40%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, transparent, var(--color-brand) 35%, var(--color-brand) 65%, transparent);
+  animation: loading-slide 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 @keyframes loading-slide {
   from {
     transform: translateX(-100%);
   }
   to {
-    transform: translateX(290%);
+    transform: translateX(250%);
   }
 }
 @media (prefers-reduced-motion: reduce) {

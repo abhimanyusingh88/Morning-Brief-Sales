@@ -7,7 +7,7 @@ import { NewsFeed } from './news-feed';
 import type { Filters, Holding, Report, Story, Metric } from '@/lib/live/types';
 import type { Series, Calendar } from '@/lib/live/intraday';
 import { briefSelection, filterStories, formatMetric, metricChange } from '@/lib/live/presentation';
-import { displayDay, stamp } from '@/lib/live/time';
+import { displayDay, futuresClosed, stamp } from '@/lib/live/time';
 export type MarketPanel = { overnight: Series[]; movers: Series[]; calendar: Calendar | null };
 export const number = (s: string) => Number(s).toLocaleString('en-US', { maximumFractionDigits: 8 });
 const time = (at: string) =>
@@ -447,7 +447,9 @@ export function ReportContent({ report, filters, market }: { report: Report; fil
               <p className="text-xs text-muted">
                 {report.archived
                   ? 'No futures chart was saved for this day.'
-                  : 'Futures chart data is unavailable right now. No values are estimated.'}
+                  : futuresClosed()
+                    ? 'Futures are closed for the weekend. The chart returns once trading resumes on Sunday at 6:00 PM ET and the delayed feed catches up; press Refresh then.'
+                    : 'Futures chart data is unavailable right now. Press Refresh to try again; no values are estimated.'}
               </p>
             </Section>
           )}

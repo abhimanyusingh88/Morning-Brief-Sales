@@ -30,10 +30,6 @@ const time = (at: string) =>
   new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }).format(
     new Date(at),
   );
-const num = (s: string) => {
-  const n = Number(s);
-  return Number.isFinite(n) ? n.toLocaleString('en-US', { maximumFractionDigits: 2 }) : s;
-};
 export async function renderPdf(report: Report, filters: Filters): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle('Sales & Trading Morning Brief - ' + report.clientName + ' - ' + report.businessDate);
@@ -280,46 +276,6 @@ export async function renderPdf(report: Report, filters: Filters): Promise<Uint8
     para(s.text, 10, f.serif, C.ink2, 1.45);
     y -= 4;
   }
-  // ---------------- client book
-  heading('Client book');
-  table(
-    [
-      { label: 'Client', width: 150 },
-      { label: 'Account', width: 56 },
-      { label: 'Stock', width: 48 },
-      { label: 'Position', width: 52 },
-      { label: 'Quantity', width: 70, align: 'right' },
-      { label: 'Current value', width: 88, align: 'right' },
-      { label: 'Spread', width: 48, align: 'right' },
-      { label: 'Margin', width: 48, align: 'right' },
-    ],
-    report.holdings
-      .map((h) => [
-        h.client,
-        h.account,
-        h.symbol,
-        h.direction,
-        num(h.quantity),
-        num(h.currentValue),
-        num(h.spread),
-        num(h.margin),
-      ])
-      .map((r) => r),
-    8,
-  );
-  text(
-    'Values as recorded in the client book' +
-      (report.holdings.some((h) => h.currency)
-        ? ' (' + [...new Set(report.holdings.map((h) => h.currency).filter(Boolean))].join(', ') + ')'
-        : '; currency and units not supplied') +
-      '. No P&L is inferred.',
-    M,
-    y,
-    7.5,
-    f.sans,
-    C.muted,
-  );
-  y -= 10;
   // ---------------- headlines
   heading('Headlines since the close');
   if (!stories.length) para('No verified stories match this view.', 10, f.serifItalic, C.muted);
@@ -383,23 +339,8 @@ export async function renderPdf(report: Report, filters: Filters): Promise<Uint8
     y -= 20;
     g.items.forEach(story);
   }
-  // ---------------- sources appendix
-  heading('Data sources');
-  table(
-    [
-      { label: 'Instrument', width: 140 },
-      { label: 'Provider', width: 170 },
-      { label: 'Retrieved', width: 110 },
-      { label: 'Cadence', width: 70 },
-    ],
-    report.metrics.map((m) => [
-      m.label,
-      m.source ?? 'Unavailable',
-      m.fetchedAt ? stamp(m.fetchedAt) : '-',
-      m.cadence === 'daily' ? 'Daily' : 'Delayed',
-    ]),
-    8,
-  );
+  // ---------------- closing note
+  y -= 6;
   para(
     'News connections indicate possible relevance; they do not establish the cause or direction of a price move. Review the original evidence before acting. For internal sales use; not investment advice.',
     8,

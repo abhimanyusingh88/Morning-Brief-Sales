@@ -4,7 +4,7 @@ import { sinceClose } from '../src/lib/live/time';
 import { routeIntent } from '../src/lib/live/assistant';
 import { templateDesk, deskFacts } from '../src/lib/live/desk';
 import { parseChart, parseCalendar } from '../src/lib/live/intraday';
-import { renderEmail, dueToSend, chartUrl, recipients } from '../src/lib/live/email';
+import { renderEmail, dueToSend, recipients } from '../src/lib/live/email';
 import { matchArticles } from '../src/lib/live/reports';
 import { validateText } from '../src/lib/ai/validator';
 import type { Article, Holding, Metric, Report } from '../src/lib/live/types';
@@ -136,7 +136,6 @@ describe('charts, calendar and email', () => {
     const s = parseChart(chart, 'ES=F', 'ES', 'https://query1.finance.yahoo.com/x');
     expect(s.points).toHaveLength(2);
     expect(s.changePct).toBeCloseTo(0.3333, 3);
-    expect(chartUrl(s)).toBeNull();
   });
   it("keeps today's releases with estimates and priors", () => {
     const c = parseCalendar(
@@ -167,11 +166,11 @@ describe('charts, calendar and email', () => {
     expect(recipients()).toEqual(['desk@firm.com', 'x@y.io']);
     delete process.env.BRIEF_RECIPIENTS;
   });
-  it('renders an escaped, sourced email with the client book', () => {
+  it('sends a short cover note that points to the attached PDF, with no brief content or client book', () => {
     const report = {
       id: 'r',
       profileId: 'p',
-      salesperson: 'S',
+      salesperson: 'S <b>x</b>',
       clientId: null,
       clientName: 'All my clients',
       businessDate: '2026-10-09',
@@ -180,7 +179,7 @@ describe('charts, calendar and email', () => {
       holdings: [hold('NVDA', 'Short')],
       metrics: [metric('SPX', 'index', 6010, 6000)],
       articles: matchArticles(
-        [art('d', 'NVIDIA <b>beats</b> estimates', ['Earnings'], ['NVDA'])],
+        [art('d', 'NVIDIA beats estimates', ['Earnings'], ['NVDA'])],
         [hold('NVDA', 'Short')],
         { sectors: [], symbols: [], timezone: '' },
         now.getTime(),
@@ -190,15 +189,19 @@ describe('charts, calendar and email', () => {
       coverage: ['NVDA'],
       desk: null,
     } as Report;
-    const m = renderEmail(
-      report,
-      { overnight: [], movers: [parseChart(chart, 'NVDA', 'NVDA', 'u')], calendar: null },
-      null,
-    );
-    expect(m.html).toContain('NVIDIA &lt;b&gt;beats&lt;/b&gt;');
-    expect(m.html).toContain('+0.33%');
-    expect(m.html).toContain('Short');
-    expect(m.subject).toContain('Morning Brief');
+    const m = renderEmail(report, 'https://brief.example');
+    expect(m.subject).toBe('Morning Brief — October 9, 2026 (PDF attached)');
+    expect(m.html).toContain('attached to this email as a PDF');
+    expect(m.html).toContain('morning-brief-2026-10-09.pdf');
+    expect(m.html).toContain('S &lt;b&gt;x&lt;/b&gt;');
+    expect(m.html).toContain('href="https://brief.example/brief"');
+    for (const body of [m.html, m.text]) {
+      expect(body).not.toContain('NVDA');
+      expect(body).not.toContain('NVIDIA');
+      expect(body).not.toContain('Short');
+    }
+    expect(m.text).toContain('attached to this email as a PDF');
+    expect(renderEmail(report, null).html).not.toContain('Open the live brief</a>');
   });
 });
 describe('sign wording', () => {

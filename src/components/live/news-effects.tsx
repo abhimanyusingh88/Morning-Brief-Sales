@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { X, Activity, LoaderCircle, RefreshCw } from 'lucide-react';
+import { X, Activity, ChevronDown, LoaderCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useReportContext } from './report-context';
 import type { EffectsAnalysis } from '@/lib/live/effects-ai';
@@ -22,7 +22,9 @@ function EffectsPanel({ story }: { story: Story }) {
     [open, setOpen] = useState(false),
     [analysis, setAnalysis] = useState<EffectsAnalysis | null>(null),
     [loading, setLoading] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    // One holding is open at a time; opening another closes it. Until the reader chooses, the first one is open.
+    [expanded, setExpanded] = useState<string | null | undefined>(undefined);
   const active = useRef<AbortController | null>(null);
   async function load() {
     if (!context) {
@@ -67,6 +69,7 @@ function EffectsPanel({ story }: { story: Story }) {
       setLoading(false);
     }
   }
+  const shown = expanded === undefined ? (analysis?.holdings[0]?.holdingId ?? null) : expanded;
   const matched = [...new Map(story.matches.map((m) => [m.clientId + ':' + m.symbol + ':' + m.direction, m])).values()];
   return (
     <Dialog.Root
@@ -141,82 +144,115 @@ function EffectsPanel({ story }: { story: Story }) {
                     ))}
                   </ul>
                 </section>
-                {analysis.holdings.map((h) => (
-                  <section key={h.holdingId} className="overflow-hidden rounded-xl border border-line">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-sunken/40 px-5 py-4">
-                      <div>
-                        <h4 className="text-base font-semibold">{h.client}</h4>
-                        <p className="mt-1 text-xs text-muted">
-                          {h.fund} · Account {h.account}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {h.impact ? (
+                {analysis.holdings.length > 1 ? (
+                  <h4 className="text-sm font-semibold">
+                    Effects by holding
+                    <span className="num ml-1.5 font-normal text-muted">{analysis.holdings.length}</span>
+                    <span className="ml-2 text-xs font-normal text-muted">Select a holding to open it</span>
+                  </h4>
+                ) : null}
+                {analysis.holdings.map((h) => {
+                  const isOpen = shown === h.holdingId,
+                    panel = 'effect-' + h.holdingId;
+                  return (
+                    <section key={h.holdingId} className="overflow-hidden rounded-xl border border-line">
+                      <button
+                        type="button"
+                        aria-expanded={isOpen}
+                        aria-controls={panel}
+                        onClick={() => setExpanded(isOpen ? null : h.holdingId)}
+                        className={
+                          'flex w-full cursor-pointer flex-wrap items-center justify-between gap-3 bg-sunken/40 px-5 py-4 text-left transition-colors hover:bg-sunken/70 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand ' +
+                          (isOpen ? 'border-b border-line' : '')
+                        }
+                      >
+                        <span className="flex min-w-0 items-center gap-3">
+                          <ChevronDown
+                            size={16}
+                            aria-hidden="true"
+                            className={'shrink-0 text-muted transition-transform ' + (isOpen ? 'rotate-180' : '')}
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-base font-semibold">{h.client}</span>
+                            <span className="mt-1 block text-xs text-muted">
+                              {h.fund} · Account {h.account}
+                            </span>
+                          </span>
+                        </span>
+                        <span className="flex flex-wrap gap-2">
+                          {h.impact ? (
+                            <span
+                              className={
+                                'rounded px-2 py-1 text-xs font-bold ' +
+                                (h.impact === 'Favourable'
+                                  ? 'bg-up-50 text-up'
+                                  : h.impact === 'Adverse'
+                                    ? 'bg-down-50 text-down'
+                                    : h.impact === 'Mixed'
+                                      ? 'bg-amber-50 text-amber'
+                                      : 'bg-sunken text-ink-2')
+                              }
+                            >
+                              {h.impact} for position
+                            </span>
+                          ) : null}
+                          {h.confidence ? (
+                            <span className="rounded border border-line bg-surface px-2 py-1 text-xs text-ink-2">
+                              {h.confidence} confidence · {h.horizon}
+                            </span>
+                          ) : null}
+                          <span className="rounded border border-line bg-surface px-2 py-1 text-xs font-semibold">
+                            {h.symbol}
+                          </span>
                           <span
                             className={
-                              'rounded px-2 py-1 text-xs font-bold ' +
-                              (h.impact === 'Favourable'
-                                ? 'bg-up-50 text-up'
-                                : h.impact === 'Adverse'
-                                  ? 'bg-down-50 text-down'
-                                  : h.impact === 'Mixed'
-                                    ? 'bg-amber-50 text-amber'
-                                    : 'bg-sunken text-ink-2')
+                              'rounded px-2 py-1 text-xs font-medium ' +
+                              (h.direction === 'Long' ? 'bg-brand-50 text-brand' : 'bg-amber-50 text-amber')
                             }
                           >
-                            {h.impact} for position
+                            {h.direction}
                           </span>
-                        ) : null}
-                        {h.confidence ? (
-                          <span className="rounded border border-line bg-surface px-2 py-1 text-xs text-ink-2">
-                            {h.confidence} confidence · {h.horizon}
-                          </span>
-                        ) : null}
-                        <span className="rounded border border-line bg-surface px-2 py-1 text-xs font-semibold">
-                          {h.symbol}
                         </span>
-                        <span
-                          className={
-                            'rounded px-2 py-1 text-xs font-medium ' +
-                            (h.direction === 'Long' ? 'bg-brand-50 text-brand' : 'bg-amber-50 text-amber')
-                          }
-                        >
-                          {h.direction}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="space-y-5 p-5">
-                      {h.talkingPoint ? (
-                        <div className="rounded-lg border-l-4 border-l-navy bg-sunken/50 px-4 py-3">
-                          <h5 className="text-[11px] font-bold uppercase tracking-wider text-muted">Talking point</h5>
-                          <p className="mt-1 text-[15px] font-medium leading-relaxed text-ink">{h.talkingPoint}</p>
+                      </button>
+                      {isOpen ? (
+                        <div id={panel} className="space-y-5 p-5">
+                          {h.talkingPoint ? (
+                            <div className="rounded-lg border-l-4 border-l-navy bg-sunken/50 px-4 py-3">
+                              <h5 className="text-[11px] font-bold uppercase tracking-wider text-muted">
+                                Talking point
+                              </h5>
+                              <p className="mt-1 text-[15px] font-medium leading-relaxed text-ink">{h.talkingPoint}</p>
+                            </div>
+                          ) : null}
+                          <div>
+                            <h5 className="text-xs font-semibold text-brand">Connection to this holding</h5>
+                            <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink-2">{h.relevance}</p>
+                          </div>
+                          {h.possibleEffects.map((effect, i) => (
+                            <div key={i}>
+                              <h5 className="text-sm font-semibold">{effect.heading}</h5>
+                              <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink-2">
+                                {effect.explanation}
+                              </p>
+                            </div>
+                          ))}
+                          <div className="rounded-lg bg-sunken/60 p-4">
+                            <h5 className="text-xs font-semibold">What remains uncertain</h5>
+                            <p className="mt-2 text-sm leading-relaxed text-ink-2">{h.uncertainty}</p>
+                          </div>
+                          <div>
+                            <h5 className="text-xs font-semibold">Specific evidence to watch</h5>
+                            <ul className="mt-2 list-disc space-y-2 pl-4 text-sm leading-relaxed text-ink-2">
+                              {h.evidenceToWatch.map((item, i) => (
+                                <li key={i}>{item}</li>
+                              ))}
+                            </ul>
+                          </div>
                         </div>
                       ) : null}
-                      <div>
-                        <h5 className="text-xs font-semibold text-brand">Connection to this holding</h5>
-                        <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink-2">{h.relevance}</p>
-                      </div>
-                      {h.possibleEffects.map((effect, i) => (
-                        <div key={i}>
-                          <h5 className="text-sm font-semibold">{effect.heading}</h5>
-                          <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-ink-2">{effect.explanation}</p>
-                        </div>
-                      ))}
-                      <div className="rounded-lg bg-sunken/60 p-4">
-                        <h5 className="text-xs font-semibold">What remains uncertain</h5>
-                        <p className="mt-2 text-sm leading-relaxed text-ink-2">{h.uncertainty}</p>
-                      </div>
-                      <div>
-                        <h5 className="text-xs font-semibold">Specific evidence to watch</h5>
-                        <ul className="mt-2 list-disc space-y-2 pl-4 text-sm leading-relaxed text-ink-2">
-                          {h.evidenceToWatch.map((item, i) => (
-                            <li key={i}>{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </section>
-                ))}
+                    </section>
+                  );
+                })}
                 <p className="text-[11px] leading-relaxed text-muted">
                   {analysis.evidenceBasis === 'original'
                     ? 'Original source reporting reviewed.'

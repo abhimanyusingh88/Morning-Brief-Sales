@@ -1,9 +1,9 @@
-import { Skeleton } from '@/components/ui/states';
+import { LoadingLine, Skeleton } from '@/components/ui/states';
 
 /** Mirrors the brief's own layout (header, filter bar, key events, market strip, panels) so nothing jumps on arrival. */
 export default function Loading() {
   return (
-    <div className="space-y-4" role="status" aria-busy="true" aria-label="Loading your morning brief">
+    <div className="space-y-4" aria-busy="true" aria-label="Loading your morning brief">
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-line bg-surface px-5 py-4 shadow-card">
         <div className="space-y-2">
           <Skeleton className="h-3 w-28" />
@@ -20,13 +20,7 @@ export default function Loading() {
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-9 flex-1" />
       </div>
-      <p className="flex items-center gap-2 px-1 text-[12.5px] font-medium text-ink-2">
-        <span
-          aria-hidden="true"
-          className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand border-t-transparent"
-        />
-        Loading your brief, market data and charts…
-      </p>
+      <LoadingLine label="Loading your brief, market data and charts…" />
       <Skeleton className="h-[76px] rounded-xl" />
       <Skeleton className="h-[150px] rounded-xl" />
       <Skeleton className="h-[74px]" />

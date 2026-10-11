@@ -2,19 +2,7 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-  ArrowLeft,
-  Download,
-  History,
-  Info,
-  Loader2,
-  Mail,
-  RefreshCw,
-  Search,
-  SlidersHorizontal,
-  Users,
-  X,
-} from 'lucide-react';
+import { ArrowLeft, Download, History, Info, Mail, RefreshCw, Search, SlidersHorizontal, Users, X } from 'lucide-react';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
@@ -353,8 +341,7 @@ export function BriefView({
           className="overflow-hidden rounded-lg border border-line bg-surface shadow-card"
         >
           <div className="loading-bar" />
-          <p className="flex items-center gap-2 px-3.5 py-2 text-[12.5px] font-medium text-ink-2">
-            <Loader2 size={14} className="animate-spin text-brand" />
+          <p className="px-3.5 py-2 text-[12.5px] font-medium text-ink-2">
             {refreshing ? 'Updating your brief from live sources…' : 'Loading…'}
           </p>
         </div>

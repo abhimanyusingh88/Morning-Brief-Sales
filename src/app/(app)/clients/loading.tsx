@@ -1,8 +1,9 @@
-import { Skeleton } from '@/components/ui/states';
+import { LoadingLine, Skeleton } from '@/components/ui/states';
 
 export default function Loading() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Loading client coverage">
+      <LoadingLine label="Loading your client coverage…" />
       <div className="space-y-2">
         <Skeleton className="h-4 w-36" />
         <Skeleton className="h-9 w-64" />

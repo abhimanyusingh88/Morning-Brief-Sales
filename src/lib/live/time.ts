@@ -29,6 +29,18 @@ export function displayDay(day: string): string {
     timeZone: 'UTC',
   });
 }
+/** US index futures do not trade from Friday 17:00 ET until Sunday 18:00 ET, so no intraday chart exists then. */
+export function futuresClosed(at = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TZ,
+    weekday: 'short',
+    hour: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(at);
+  const day = parts.find((x) => x.type === 'weekday')?.value,
+    hour = Number(parts.find((x) => x.type === 'hour')?.value);
+  return day === 'Sat' || (day === 'Fri' && hour >= 17) || (day === 'Sun' && hour < 18);
+}
 /** Offset of New York from UTC at a given instant, e.g. "-04:00". */
 export function etOffset(at: Date): string {
   const p =

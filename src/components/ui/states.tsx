@@ -4,6 +4,20 @@ import { cn } from '@/lib/cn';
 
 export const Skeleton = ({ className }: { className?: string }) => <div className={cn('skeleton', className)} />;
 
+/** A running line with a label: unmistakably in motion, so a slow load is never mistaken for a stuck page. */
+export function LoadingLine({ label }: { label: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="overflow-hidden rounded-lg border border-line bg-surface shadow-card"
+    >
+      <div className="loading-bar" />
+      <p className="px-3.5 py-2 text-[12.5px] font-medium text-ink-2">{label}</p>
+    </div>
+  );
+}
+
 export function EmptyState({
   title,
   body,

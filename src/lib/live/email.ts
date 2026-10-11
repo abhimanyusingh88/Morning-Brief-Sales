@@ -2,27 +2,19 @@ import type { Db } from '../db/types';
 import { uid } from '../util/id';
 import { makeReport } from './reports';
 import { businessDate, displayDay, stamp } from './time';
-import { briefSelection, formatMetric, metricChange, filterStories } from './presentation';
-import { THEMES, themeOf } from './classify';
 import { renderPdf } from './pdf';
-import { getCalendar, getMovers, getSeries, OVERNIGHT, type Series, type Calendar } from './intraday';
-import { EMPTY_FILTERS, type Report, type Story } from './types';
+import { EMPTY_FILTERS, type Report } from './types';
 // Internal distribution of the morning brief to the desk. This never addresses a client: recipients
 // come only from BRIEF_RECIPIENTS, and the content is the salesperson's own brief.
 export const DESK_PROFILE = uid('live:sales-1');
 const esc = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const NAVY = '#172b3e',
-  UP = '#0b704b',
-  DOWN = '#c8352f',
+  BRAND = '#086d77',
+  INK = '#213547',
   MUTED = '#52677c',
-  LINE = '#dfe6ed';
-const color = (v: number | null | undefined) => (v == null ? MUTED : v > 0 ? UP : v < 0 ? DOWN : MUTED);
-const pct = (v: number | null) => (v == null ? '—' : (v > 0 ? '+' : '') + v.toFixed(2) + '%');
-const time = (at: string) =>
-  new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }).format(
-    new Date(at),
-  );
+  LINE = '#dfe6ed',
+  PAGE = '#edf2f6';
 export function recipients(): string[] {
   return (process.env.BRIEF_RECIPIENTS ?? '')
     .split(/[,;\s]+/)
@@ -30,322 +22,124 @@ export function recipients(): string[] {
     .filter((s) => /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(s))
     .slice(0, 20);
 }
-/** Real intraday data rendered as a static PNG by QuickChart, because mail clients do not render SVG. */
-export function chartUrl(s: Series): string | null {
-  if (s.points.length < 3) return null;
-  const step = Math.max(1, Math.ceil(s.points.length / 90));
-  const pts = s.points.filter((_, i) => i % step === 0);
-  const up = s.previousClose == null || s.last >= s.previousClose;
-  const cfg = {
-    type: 'line',
-    data: {
-      labels: pts.map((p) => time(new Date(p.t).toISOString())),
-      datasets: [
-        {
-          data: pts.map((p) => +p.v.toFixed(2)),
-          borderColor: up ? '#3ddc97' : '#ff6b6b',
-          borderWidth: 2,
-          pointRadius: 0,
-          fill: false,
-        },
-        ...(s.previousClose
-          ? [
-              {
-                data: pts.map(() => s.previousClose),
-                borderColor: '#e8a33d',
-                borderDash: [4, 4],
-                borderWidth: 1,
-                pointRadius: 0,
-                fill: false,
-              },
-            ]
-          : []),
-      ],
-    },
-    options: {
-      legend: { display: false },
-      scales: {
-        xAxes: [{ ticks: { fontColor: '#9fb3c8', maxTicksLimit: 6 }, gridLines: { display: false } }],
-        yAxes: [{ position: 'right', ticks: { fontColor: '#9fb3c8' }, gridLines: { color: 'rgba(255,255,255,0.07)' } }],
-      },
-    },
-  };
-  return 'https://quickchart.io/chart?w=640&h=240&bkg=%230b1520&c=' + encodeURIComponent(JSON.stringify(cfg));
-}
-const STRIP = ['SPX', 'DJI', 'NDX', 'RUT', 'SX5E', 'UST10Y', 'BRENT', 'GOLD', 'BTC', 'VIX'];
-const SHORT: Record<string, string> = {
-  SPX: 'S&amp;P 500',
-  DJI: 'Dow',
-  NDX: 'Nasdaq 100',
-  RUT: 'Russell 2000',
-  SX5E: 'Euro Stoxx',
-  UST10Y: 'UST 10Y',
-  BRENT: 'Brent',
-  GOLD: 'Gold',
-  BTC: 'Bitcoin',
-  VIX: 'VIX',
-};
-const h2 = (t: string) =>
-  '<tr><td style="padding:22px 0 6px;border-bottom:2px solid ' +
-  NAVY +
-  ';font:700 12px/1 Arial,sans-serif;letter-spacing:1.5px;text-transform:uppercase;color:' +
-  NAVY +
-  '">' +
-  t +
-  '</td></tr>';
-export function renderEmail(
-  report: Report,
-  market: { overnight: Series[]; movers: Series[]; calendar: Calendar | null },
-  appUrl: string | null,
-): { subject: string; html: string; text: string } {
-  const stories = briefSelection(filterStories(report, EMPTY_FILTERS));
-  const desk = report.desk;
-  const events = desk?.keyEvents?.length
-    ? desk.keyEvents.map((e) => e.text)
-    : stories.slice(0, 6).map((a) => a.title + ' — ' + a.publisher);
-  const strip = STRIP.map((k) => report.metrics.find((m) => m.key === k))
-    .filter((m) => m && m.value !== null)
-    .map((m) => {
-      const c = metricChange(m!);
-      return (
-        '<td align="center" style="padding:8px 4px;border-right:1px solid ' +
-        LINE +
-        '"><div style="font:600 10px Arial;color:' +
-        MUTED +
-        ';text-transform:uppercase">' +
-        SHORT[m!.key] +
-        '</div><div style="font:700 14px Arial;color:' +
-        color(c?.value) +
-        ';padding-top:3px">' +
-        (c ? esc(c.label) : '—') +
-        '</div><div style="font:11px Arial;color:#425b70">' +
-        esc(formatMetric(m!)) +
-        '</div></td>'
-      );
-    })
-    .join('');
-  const bullet = (html: string) =>
-    '<tr><td style="padding:4px 0 4px 14px;font:14px/1.55 Arial,sans-serif;color:#213547">&bull;&nbsp; ' +
-    html +
-    '</td></tr>';
-  const label = (t: string) => {
-    const m = /^([^:]{2,30}):\s([\s\S]+)$/.exec(t);
-    return m ? '<b>' + esc(m[1]) + ':</b> ' + esc(m[2]) : esc(t);
-  };
-  const book = report.holdings
-    .map((h) => ({
-      h,
-      s: market.movers.find((m) => m.symbol === h.symbol),
-      n: stories.filter((a) => a.matches.some((m) => m.symbol === h.symbol)).length,
-    }))
-    .sort((a, b) => Math.abs(b.s?.changePct ?? 0) - Math.abs(a.s?.changePct ?? 0));
-  const th = (t: string, r = false) =>
-    '<th align="' +
-    (r ? 'right' : 'left') +
-    '" style="padding:6px 8px;font:700 10px Arial;color:' +
-    MUTED +
-    ';text-transform:uppercase;background:#edf2f6">' +
-    t +
-    '</th>';
-  const td = (t: string, r = false, c = '#213547') =>
-    '<td align="' +
-    (r ? 'right' : 'left') +
-    '" style="padding:6px 8px;font:12px Arial;color:' +
-    c +
-    ';border-bottom:1px solid ' +
-    LINE +
-    '">' +
-    t +
-    '</td>';
-  const headline = (a: Story) =>
-    '<tr><td style="padding:8px 0;border-bottom:1px solid ' +
-    LINE +
-    '"><a href="' +
-    esc(a.url) +
-    '" style="font:700 14px/1.4 Arial;color:#213547;text-decoration:none">' +
-    esc(a.title) +
-    '</a>' +
-    (a.excerpt && a.excerpt !== a.title
-      ? '<div style="font:13px/1.5 Arial;color:#425b70;padding-top:3px">' + esc(a.excerpt.slice(0, 260)) + '</div>'
-      : '') +
-    '<div style="font:11px Arial;color:' +
-    MUTED +
-    ';padding-top:4px">' +
-    esc(a.publisher) +
-    ' · ' +
-    time(a.publishedAt) +
-    ' ET' +
-    (a.matches.length
-      ? ' · <b style="color:#086d77">' +
-        esc([...new Set(a.matches.map((m) => m.symbol + ' ' + m.direction))].slice(0, 5).join(', ')) +
-        '</b>'
-      : '') +
-    '</div></td></tr>';
-  const groups = THEMES.map((t) => ({
-    t,
-    items: stories.filter((a) => themeOf(a.topics).key === t.key).slice(0, 7),
-  })).filter((g) => g.items.length);
-  const charts = market.overnight.map((s) => ({ s, url: chartUrl(s) })).filter((x) => x.url);
+export const pdfName = (date: string) => 'morning-brief-' + date + '.pdf';
+/**
+ * A short cover note. The brief itself travels as the attached PDF, so the message only says what is attached and
+ * where to find the live version. Tables and inline styles only: mail clients ignore stylesheets.
+ */
+export function renderEmail(report: Report, appUrl: string | null): { subject: string; html: string; text: string } {
+  const day = displayDay(report.businessDate),
+    file = pdfName(report.businessDate),
+    prepared = stamp(report.cutoff);
+  const contents = ['Key events', 'Markets snapshot', 'Market wrap', 'Headlines since the close'];
   const html =
-    '<!doctype html><html><body style="margin:0;background:#f5f7fa"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f7fa"><tr><td align="center" style="padding:16px 8px"><table width="680" cellpadding="0" cellspacing="0" style="max-width:680px;width:100%;background:#fff;border:1px solid ' +
-    LINE +
+    '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Morning Brief</title></head>' +
+    '<body style="margin:0;padding:0;background:' +
+    PAGE +
     '">' +
+    // Preview line shown beside the subject in most inboxes.
+    '<div style="display:none;max-height:0;overflow:hidden;opacity:0">Your morning brief for ' +
+    esc(day) +
+    ' is attached as a PDF.</div>' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' +
+    PAGE +
+    '"><tr><td align="center" style="padding:32px 16px">' +
+    '<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;background:#ffffff;border:1px solid ' +
+    LINE +
+    ';border-radius:12px;overflow:hidden">' +
     '<tr><td style="background:' +
     NAVY +
-    ';padding:16px 22px"><table width="100%"><tr><td style="font:700 20px Georgia,serif;color:#fff">Sales &amp; Trading Morning Brief</td><td align="right" style="font:12px Arial;color:#cfd9e3">' +
-    esc(displayDay(report.businessDate)) +
-    '</td></tr></table></td></tr>' +
-    '<tr><td style="padding:4px 22px 22px"><table width="100%" cellpadding="0" cellspacing="0">' +
-    '<tr><td style="padding:16px 0 0"><table width="100%" style="background:#f5f7fa;border-left:4px solid #086d77"><tr><td style="padding:12px 14px"><div style="font:700 12px Arial;letter-spacing:1.5px;color:' +
-    NAVY +
-    ';text-transform:uppercase;padding-bottom:6px">Key events today</div><table width="100%">' +
-    events.map((e) => bullet(label(e))).join('') +
-    '</table></td></tr></table></td></tr>' +
-    (strip
-      ? '<tr><td style="padding-top:14px"><table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ' +
-        LINE +
-        '"><tr>' +
-        strip +
-        '</tr></table><div style="font:10px Arial;color:' +
-        MUTED +
-        ';padding-top:4px">Index and yield moves in bp vs prior close; commodities and crypto in %.</div></td></tr>'
-      : '') +
-    h2('Market wrap') +
-    (desk?.wrap?.length
-      ? desk.wrap
-          .map(
-            (p, i) =>
-              '<tr><td style="padding:8px 0 0;font:' +
-              (i === 0 ? '600 ' : '') +
-              '15px/1.65 Georgia,serif;color:#213547">' +
-              esc(p) +
-              '</td></tr>',
-          )
-          .join('')
-      : '<tr><td style="padding:8px 0;font:13px Arial;color:' +
-        MUTED +
-        '">The wrap is prepared after the first source refresh.</td></tr>') +
-    charts
-      .map(
-        ({ s, url }) =>
-          h2(
-            'Overnight · ' +
-              esc(s.label) +
-              ' <span style="color:' +
-              color(s.changePct) +
-              '">' +
-              pct(s.changePct) +
-              '</span>',
-          ) +
-          '<tr><td style="padding-top:8px"><img src="' +
-          esc(url!) +
-          '" width="636" style="width:100%;max-width:636px;display:block;border-radius:6px" alt="' +
-          esc(s.label) +
-          ' intraday chart"><div style="font:10px Arial;color:' +
-          MUTED +
-          ';padding-top:3px">' +
-          esc(s.source) +
-          ' · last ' +
-          esc(stamp(s.at)) +
-          '</div></td></tr>',
-      )
-      .join('') +
-    (desk?.sections?.length
-      ? desk.sections
-          .map(
-            (s) =>
-              h2(esc(s.title)) +
-              '<tr><td style="padding-top:8px;font:14px/1.6 Georgia,serif;color:#425b70">' +
-              esc(s.text) +
-              '</td></tr>',
-          )
-          .join('')
-      : '') +
-    (market.calendar?.events.length
-      ? h2('Economic data (ET)') +
-        '<tr><td style="padding-top:6px"><table width="100%" cellpadding="0" cellspacing="0"><tr>' +
-        th('Time') +
-        th('Release') +
-        th('Est.', true) +
-        th('Prior', true) +
-        '</tr>' +
-        market.calendar.events
-          .map(
-            (e) =>
-              '<tr>' +
-              td(time(e.time)) +
-              td(esc(e.country + ' · ' + e.title)) +
-              td(esc(e.forecast || '—'), true) +
-              td(esc(e.previous || '—'), true) +
-              '</tr>',
-          )
-          .join('') +
-        '</table></td></tr>'
-      : '') +
-    (book.length
-      ? h2('Client book') +
-        '<tr><td style="padding-top:6px"><table width="100%" cellpadding="0" cellspacing="0"><tr>' +
-        th('Client') +
-        th('Stock') +
-        th('Pos.') +
-        th('Last', true) +
-        th('Day', true) +
-        th('Stories', true) +
-        '</tr>' +
-        book
-          .map(
-            ({ h, s, n }) =>
-              '<tr>' +
-              td(esc(h.client)) +
-              td('<b>' + esc(h.symbol) + '</b>') +
-              td(h.direction, false, h.direction === 'Long' ? UP : DOWN) +
-              td(s ? s.last.toFixed(2) : '—', true) +
-              td(pct(s?.changePct ?? null), true, color(s?.changePct)) +
-              td(String(n), true) +
-              '</tr>',
-          )
-          .join('') +
-        '</table></td></tr>'
-      : '') +
-    h2('Headlines since the close') +
-    groups
-      .map(
-        (g) =>
-          '<tr><td style="padding:12px 0 2px;font:italic 700 13px Arial;color:#086d77">' +
-          esc(g.t.label) +
-          '</td></tr>' +
-          g.items.map(headline).join(''),
-      )
-      .join('') +
-    '<tr><td style="padding:18px 0 0;font:10px/1.5 Arial;color:' +
-    MUTED +
+    ';padding:28px 32px">' +
+    '<div style="font:700 11px/1 Arial,sans-serif;letter-spacing:2px;text-transform:uppercase;color:#8fd3da">Sales &amp; Trading</div>' +
+    '<div style="font:600 26px/1.25 Georgia,serif;color:#ffffff;padding-top:10px">Morning Brief</div>' +
+    '<div style="font:14px/1.4 Arial,sans-serif;color:#c8d6e3;padding-top:6px">' +
+    esc(day) +
+    '</div></td></tr>' +
+    '<tr><td style="padding:28px 32px 8px;font:15px/1.65 Arial,sans-serif;color:' +
+    INK +
     '">' +
+    '<p style="margin:0 0 14px">Good morning,</p>' +
+    '<p style="margin:0 0 14px">Your morning brief for <strong>' +
+    esc(day) +
+    '</strong> is ready. The complete brief is <strong>attached to this email as a PDF</strong>, so you can read it offline or share it with the desk.</p>' +
+    '</td></tr>' +
+    '<tr><td style="padding:8px 32px 0">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ' +
+    LINE +
+    ';border-left:4px solid ' +
+    BRAND +
+    ';border-radius:8px;background:#f7fafc"><tr><td style="padding:16px 18px">' +
+    '<div style="font:700 10px/1 Arial,sans-serif;letter-spacing:1.5px;text-transform:uppercase;color:' +
+    MUTED +
+    '">Attached</div>' +
+    '<div style="font:600 15px/1.4 Arial,sans-serif;color:' +
+    NAVY +
+    ';padding-top:8px">' +
+    esc(file) +
+    '</div>' +
+    '<div style="font:13px/1.5 Arial,sans-serif;color:' +
+    MUTED +
+    ';padding-top:2px">Prepared for ' +
+    esc(report.salesperson) +
+    ' · ' +
     esc(report.clientName) +
-    ' · prepared ' +
-    esc(stamp(report.cutoff)) +
-    (appUrl ? ' · <a href="' + esc(appUrl) + '/brief" style="color:#086d77">Open the live brief</a>' : '') +
-    '<br>For internal sales use only. Sourced headlines link to the original publisher; news connections indicate possible relevance, not the cause or direction of a price move. Not investment advice.</td></tr>' +
-    '</table></td></tr></table></td></tr></table></body></html>';
+    ' · ' +
+    esc(prepared) +
+    '</div></td></tr></table></td></tr>' +
+    '<tr><td style="padding:22px 32px 0">' +
+    '<div style="font:700 10px/1 Arial,sans-serif;letter-spacing:1.5px;text-transform:uppercase;color:' +
+    MUTED +
+    ';padding-bottom:6px">Inside the PDF</div>' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">' +
+    contents
+      .map(
+        (c) =>
+          '<tr><td width="18" valign="top" style="padding:5px 0;font:14px/1.5 Arial,sans-serif;color:' +
+          BRAND +
+          '">&bull;</td><td style="padding:5px 0;font:14px/1.5 Arial,sans-serif;color:' +
+          INK +
+          '">' +
+          c +
+          '</td></tr>',
+      )
+      .join('') +
+    '</table></td></tr>' +
+    (appUrl
+      ? '<tr><td style="padding:24px 32px 0"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:' +
+        BRAND +
+        ';border-radius:8px"><a href="' +
+        esc(appUrl) +
+        '/brief" style="display:inline-block;padding:12px 22px;font:600 14px/1 Arial,sans-serif;color:#ffffff;text-decoration:none">Open the live brief</a></td></tr></table>' +
+        '<div style="font:12px/1.5 Arial,sans-serif;color:' +
+        MUTED +
+        ';padding-top:10px">The live brief keeps updating through the day with new headlines and prices.</div></td></tr>'
+      : '') +
+    '<tr><td style="padding:26px 32px 0"><div style="border-top:1px solid ' +
+    LINE +
+    ';font-size:0;line-height:0">&nbsp;</div></td></tr>' +
+    '<tr><td style="padding:16px 32px 28px;font:11px/1.6 Arial,sans-serif;color:' +
+    MUTED +
+    '">For internal sales use only. Not investment advice. News connections indicate possible relevance, not the cause or direction of a price move. If the attachment is missing, open the live brief and download the PDF from there.</td></tr>' +
+    '</table></td></tr></table></body></html>';
   const text = [
-    'Sales & Trading Morning Brief — ' + displayDay(report.businessDate),
+    'Sales & Trading Morning Brief — ' + day,
     '',
-    'KEY EVENTS',
-    ...events.map((e) => '- ' + e),
+    'Good morning,',
     '',
-    'MARKET WRAP',
-    ...(desk?.wrap ?? []),
+    'Your morning brief for ' +
+      day +
+      ' is ready. The complete brief is attached to this email as a PDF (' +
+      file +
+      ').',
     '',
-    'HEADLINES',
-    ...stories.map((a) => '- ' + a.title + ' (' + a.publisher + ') ' + a.url),
+    'Inside the PDF:',
+    ...contents.map((c) => '- ' + c),
+    '',
+    ...(appUrl ? ['Open the live brief: ' + appUrl + '/brief', ''] : []),
+    'Prepared for ' + report.salesperson + ' · ' + report.clientName + ' · ' + prepared,
+    'For internal sales use only. Not investment advice.',
   ].join('\n');
-  return {
-    subject:
-      'Morning Brief — ' +
-      displayDay(report.businessDate) +
-      (events[0] ? ' | ' + events[0].replace(/^[^:]{2,30}:\s/, '').slice(0, 80) : ''),
-    html,
-    text,
-  };
+  return { subject: 'Morning Brief — ' + day + ' (PDF attached)', html, text };
 }
 type Mail = { subject: string; html: string; text: string; attachments?: { filename: string; content: string }[] };
 async function sendViaResend(to: string, mail: Mail, key: string): Promise<string> {
@@ -417,20 +211,13 @@ export async function sendMorningBrief(
         )
       ).filter((x): x is string => !!x);
   if (!pending.length) return { sent: [], failed: [], skipped: 'ALREADY_SENT' };
-  const report = await makeReport(db, DESK_PROFILE, null, now);
-  const [overnight, movers, calendar] = await Promise.all([
-    Promise.all(OVERNIGHT.map((o) => getSeries(o.symbol, o.label, '1d', '5m'))),
-    getMovers(report.coverage),
-    getCalendar(now, db),
-  ]);
-  const mail = renderEmail(
-    { ...report, id: 'email-' + date },
-    { overnight: overnight.filter((s): s is Series => !!s), movers, calendar },
-    process.env.APP_URL ?? null,
-  );
-  // The same brief as a downloadable PDF, for reading offline or forwarding internally.
-  const pdf = Buffer.from(await renderPdf({ ...report, id: 'email-' + date }, EMPTY_FILTERS)).toString('base64');
-  const message: Mail = { ...mail, attachments: [{ filename: 'morning-brief-' + date + '.pdf', content: pdf }] };
+  const report = { ...(await makeReport(db, DESK_PROFILE, null, now)), id: 'email-' + date };
+  // The brief travels as the PDF; the message is only a cover note. Without the PDF there is nothing to send.
+  const pdf = Buffer.from(await renderPdf(report, EMPTY_FILTERS)).toString('base64');
+  const message: Mail = {
+    ...renderEmail(report, process.env.APP_URL ?? null),
+    attachments: [{ filename: pdfName(date), content: pdf }],
+  };
   const sent: string[] = [],
     failed: string[] = [];
   for (const r of pending) {
