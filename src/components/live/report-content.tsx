@@ -473,9 +473,11 @@ export function ReportContent({ report, filters, market }: { report: Report; fil
               </table>
             ) : (
               <p className="text-xs text-muted">
-                {report.archived
-                  ? 'No economic calendar was saved for this day.'
-                  : 'The economic calendar source is unavailable. No releases are assumed.'}
+                {market?.calendar
+                  ? 'No economic releases were scheduled for this day, and no major US releases remained that week.'
+                  : report.archived
+                    ? 'No economic calendar was saved for this day.'
+                    : 'The economic calendar source is unavailable. No releases are assumed.'}
               </p>
             )}
             {market?.calendar ? (

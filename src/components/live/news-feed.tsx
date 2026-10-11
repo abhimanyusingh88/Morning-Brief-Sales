@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import * as Popover from '@radix-ui/react-popover';
-import { ArrowUpRight, Check, Filter } from 'lucide-react';
+import { ArrowUpRight, Check, Filter, X } from 'lucide-react';
 import { NewsReader } from './news-reader';
 import { NewsEffects } from './news-effects';
 import { THEMES, themeOf } from '@/lib/live/classify';
@@ -15,31 +16,86 @@ const KIND = {
   industry: { label: 'Read-across', bar: 'bg-amber', text: 'text-amber' },
   macro: { label: 'Market', bar: 'bg-line-strong', text: 'text-muted' },
 } as const;
-function Tickers({ story, max = 6 }: { story: Story; max?: number }) {
+function Ticker({ sym, dir }: { sym: string; dir: string }) {
+  return (
+    <span
+      title={sym + ' ' + dir}
+      className="inline-flex h-6 items-center overflow-hidden rounded-md border border-line-strong bg-surface text-[11px] font-semibold"
+    >
+      <span className="mono px-1.5 text-ink">{sym}</span>
+      <span
+        className={
+          'flex h-full items-center border-l border-line-strong px-1.5 text-[10px] font-bold ' +
+          (dir === 'Long' ? 'bg-up-50 text-up' : 'bg-down-50 text-down')
+        }
+      >
+        {dir === 'Long' ? 'LONG' : 'SHORT'}
+      </span>
+    </span>
+  );
+}
+/** A story shows its first few holdings; the rest open in a dialog so a large book never crowds the row. */
+function Tickers({ story, max = 3 }: { story: Story; max?: number }) {
   const t = [...new Set(story.matches.map((m) => m.symbol + ' ' + m.direction))];
   return (
     <>
       {t.slice(0, max).map((x) => {
         const [sym, dir] = x.split(' ');
-        return (
-          <span
-            key={x}
-            title={sym + ' ' + dir}
-            className="inline-flex h-6 items-center overflow-hidden rounded-md border border-line-strong bg-surface text-[11px] font-semibold"
-          >
-            <span className="mono px-1.5 text-ink">{sym}</span>
-            <span
-              className={
-                'flex h-full items-center border-l border-line-strong px-1.5 text-[10px] font-bold ' +
-                (dir === 'Long' ? 'bg-up-50 text-up' : 'bg-down-50 text-down')
-              }
-            >
-              {dir === 'Long' ? 'LONG' : 'SHORT'}
-            </span>
-          </span>
-        );
+        return <Ticker key={x} sym={sym} dir={dir} />;
       })}
-      {t.length > max ? <span className="text-[10px] text-muted">+{t.length - max}</span> : null}
+      {t.length > max ? (
+        <Dialog.Root>
+          <Dialog.Trigger asChild>
+            <button
+              type="button"
+              aria-label={'Show all ' + t.length + ' holdings linked to this story'}
+              className="num inline-flex h-6 items-center rounded-md border border-line-strong bg-sunken px-1.5 text-[11px] font-semibold text-ink-2 transition-colors hover:border-brand hover:text-brand"
+            >
+              +{t.length - max}
+            </button>
+          </Dialog.Trigger>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 z-[60] bg-navy/40 backdrop-blur-[2px]" />
+            <Dialog.Content className="fixed left-1/2 top-1/2 z-[61] flex max-h-[80dvh] w-[calc(100%-32px)] max-w-[440px] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-line bg-surface shadow-[0_24px_60px_rgba(14,22,39,0.25)] focus:outline-none">
+              <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
+                <div className="min-w-0">
+                  <Dialog.Title className="text-[15px] font-semibold text-ink">Linked holdings</Dialog.Title>
+                  <Dialog.Description className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-muted">
+                    {story.title}
+                  </Dialog.Description>
+                </div>
+                <Dialog.Close asChild>
+                  <button
+                    type="button"
+                    aria-label="Close"
+                    className="rounded p-1 text-muted hover:bg-sunken hover:text-ink"
+                  >
+                    <X size={16} />
+                  </button>
+                </Dialog.Close>
+              </div>
+              <ul className="min-h-0 flex-1 divide-y divide-line overflow-y-auto px-5">
+                {t.map((x) => {
+                  const [sym, dir] = x.split(' ');
+                  const clients = [
+                    ...new Set(
+                      story.matches.filter((m) => m.symbol === sym && m.direction === dir).map((m) => m.client),
+                    ),
+                  ];
+                  return (
+                    <li key={x} className="flex items-center justify-between gap-3 py-2.5">
+                      <Ticker sym={sym} dir={dir} />
+                      <span className="min-w-0 truncate text-right text-[12px] text-ink-2" title={clients.join(', ')}>
+                        {clients.join(', ')}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+      ) : null}
     </>
   );
 }
@@ -96,7 +152,7 @@ function Lead({ story }: { story: Story }) {
             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted">Why it matters</p>
             <p className="mt-1.5 text-[13px] leading-relaxed text-ink-2">{story.reason}</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              <Tickers story={story} max={8} />
+              <Tickers story={story} />
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -142,7 +198,7 @@ function Row({ story }: { story: Story }) {
       </div>
       <div className="flex items-center justify-between gap-3 md:justify-end">
         <div className="flex flex-wrap gap-1.5 md:justify-end">
-          <Tickers story={story} max={4} />
+          <Tickers story={story} />
         </div>
         <NewsEffects story={story} />
       </div>
