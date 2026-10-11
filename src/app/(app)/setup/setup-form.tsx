@@ -158,235 +158,244 @@ export function SetupForm({
   ].join(' · ');
 
   return (
-    <form onSubmit={save} className="space-y-5" aria-busy={saving}>
+    <form onSubmit={save} className="space-y-5 pb-4" aria-busy={saving}>
       <div className="rounded-lg border border-line bg-sunken/50 px-4 py-3">
         <p className="eyebrow">Your brief will show</p>
         <p className="mt-1 text-[13.5px] font-medium text-ink">{summary}</p>
       </div>
 
-      <Card>
-        <CardHeader
-          title={
-            <>
-              <Step n={1} />
-              Clients
-            </>
-          }
-          sub="The brief, client list and search show only the clients you tick. Tick none to show your whole book."
-          right={
-            clients.length ? (
-              <TextLink
-                onClick={() =>
-                  edit((x) => ({ ...x, clients: x.clients.length === clients.length ? [] : clients.map((c) => c.id) }))
-                }
-              >
-                {p.clients.length === clients.length ? 'Clear all' : 'Select all'}
-              </TextLink>
-            ) : null
-          }
-        />
-        <CardBody>
-          {!clients.length ? (
-            <p className="text-[13px] text-muted">No clients are assigned to you yet.</p>
-          ) : (
-            <>
-              {clients.length > 8 ? (
-                <label className="mb-3 flex h-9 items-center rounded-lg border border-line-strong bg-surface focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-100">
-                  <Search size={14} aria-hidden="true" className="ml-3 shrink-0 text-muted" />
-                  <input
-                    value={find}
-                    onChange={(e) => setFind(e.target.value)}
-                    aria-label="Find a client or stock"
-                    placeholder="Find a client or stock…"
-                    className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-[13px] outline-none placeholder:text-muted"
-                  />
-                </label>
-              ) : null}
-              <div className="grid gap-2 sm:grid-cols-2">
-                {shown.map((c) => {
-                  const on = p.clients.includes(c.id);
-                  return (
-                    <button
-                      type="button"
-                      key={c.id}
-                      role="checkbox"
-                      aria-checked={on}
-                      disabled={saving}
-                      onClick={() => edit((x) => ({ ...x, clients: toggle(x.clients, c.id) }))}
-                      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-60 ${on ? 'border-brand/50 bg-brand-50' : 'border-line-strong hover:bg-sunken'}`}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${on ? 'border-brand bg-brand text-white' : 'border-line-strong bg-surface'}`}
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <Card className="xl:sticky xl:top-0">
+          <CardHeader
+            title={
+              <>
+                <Step n={1} />
+                Clients
+              </>
+            }
+            sub="The brief, client list and search show only the clients you tick. Tick none to show your whole book."
+            right={
+              clients.length ? (
+                <TextLink
+                  onClick={() =>
+                    edit((x) => ({
+                      ...x,
+                      clients: x.clients.length === clients.length ? [] : clients.map((c) => c.id),
+                    }))
+                  }
+                >
+                  {p.clients.length === clients.length ? 'Clear all' : 'Select all'}
+                </TextLink>
+              ) : null
+            }
+          />
+          <CardBody>
+            {!clients.length ? (
+              <p className="text-[13px] text-muted">No clients are assigned to you yet.</p>
+            ) : (
+              <>
+                {clients.length > 8 ? (
+                  <label className="mb-3 flex h-9 items-center rounded-lg border border-line-strong bg-surface focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-100">
+                    <Search size={14} aria-hidden="true" className="ml-3 shrink-0 text-muted" />
+                    <input
+                      value={find}
+                      onChange={(e) => setFind(e.target.value)}
+                      aria-label="Find a client or stock"
+                      placeholder="Find a client or stock…"
+                      className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-[13px] outline-none placeholder:text-muted"
+                    />
+                  </label>
+                ) : null}
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                  {shown.map((c) => {
+                    const on = p.clients.includes(c.id);
+                    return (
+                      <button
+                        type="button"
+                        key={c.id}
+                        role="checkbox"
+                        aria-checked={on}
+                        disabled={saving}
+                        onClick={() => edit((x) => ({ ...x, clients: toggle(x.clients, c.id) }))}
+                        className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-60 ${on ? 'border-brand/50 bg-brand-50' : 'border-line-strong hover:bg-sunken'}`}
                       >
-                        {on ? <Check size={11} strokeWidth={3} /> : null}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-[13.5px] font-medium text-ink">{c.name}</span>
-                          <span className="num shrink-0 text-[11px] text-muted">{plural(c.holdings, 'position')}</span>
+                        <span
+                          aria-hidden="true"
+                          className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${on ? 'border-brand bg-brand text-white' : 'border-line-strong bg-surface'}`}
+                        >
+                          {on ? <Check size={11} strokeWidth={3} /> : null}
                         </span>
-                        <span className="mono mt-0.5 block truncate text-[11.5px] text-muted">
-                          {c.symbols.join(' · ')}
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-baseline justify-between gap-2">
+                            <span className="text-[13.5px] font-medium leading-snug text-ink">{c.name}</span>
+                            <span className="num shrink-0 text-[11px] text-muted">
+                              {plural(c.holdings, 'position')}
+                            </span>
+                          </span>
+                          <span className="mono mt-0.5 block truncate text-[11.5px] text-muted">
+                            {c.symbols.join(' · ')}
+                          </span>
                         </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              {!shown.length ? <p className="text-[13px] text-muted">No client matches “{find.trim()}”.</p> : null}
-            </>
-          )}
-        </CardBody>
-      </Card>
+                      </button>
+                    );
+                  })}
+                </div>
+                {!shown.length ? <p className="text-[13px] text-muted">No client matches “{find.trim()}”.</p> : null}
+              </>
+            )}
+          </CardBody>
+        </Card>
 
-      <Card>
-        <CardHeader
-          title={
-            <>
-              <Step n={2} />
-              Topics you cover
-            </>
-          }
-          sub="News on your clients’ holdings is always included. These topics add wider industry news to the brief."
-          right={
-            p.sectors.length ? (
-              <TextLink onClick={() => edit((x) => ({ ...x, sectors: [] }))}>Clear ({p.sectors.length})</TextLink>
-            ) : null
-          }
-        />
-        <CardBody>
-          <div className="flex flex-wrap gap-2">
-            {TOPICS.map((t) => (
-              <Chip
-                key={t}
-                disabled={saving}
-                selected={p.sectors.includes(t)}
-                onClick={() => edit((x) => ({ ...x, sectors: toggle(x.sectors, t) }))}
-              >
-                {t}
-              </Chip>
-            ))}
-          </div>
-          <label htmlFor="watch" className="mt-5 block text-[13px] font-medium text-ink">
-            Extra stocks to watch{' '}
-            <span className="num font-normal text-muted">
-              ({p.watch.length}/{MAX_WATCH})
-            </span>
-          </label>
-          <div className="mt-2 flex min-h-9 flex-wrap items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-2 py-1.5 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-100">
-            {p.watch.map((s) => (
-              <span
-                key={s}
-                className="mono inline-flex h-6 items-center gap-1 rounded-md border border-line-strong bg-sunken pl-2 pr-1 text-[12px] font-semibold text-ink"
-              >
-                {s}
-                <button
-                  type="button"
-                  aria-label={'Remove ' + s}
-                  disabled={saving}
-                  onClick={() => edit((x) => ({ ...x, watch: x.watch.filter((w) => w !== s) }))}
-                  className="rounded p-0.5 text-muted hover:bg-line hover:text-ink"
-                >
-                  <X size={11} />
-                </button>
-              </span>
-            ))}
-            <input
-              id="watch"
-              value={entry}
-              disabled={saving}
-              maxLength={80}
-              aria-invalid={Boolean(entryError)}
-              aria-describedby="watch-help"
-              placeholder={p.watch.length ? 'Add another…' : 'Type a ticker and press Enter'}
-              onChange={(e) => {
-                setEntryError('');
-                if (/[\s,]$/.test(e.target.value)) addWatch(e.target.value);
-                else setEntry(e.target.value);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addWatch(entry);
-                } else if (e.key === 'Backspace' && !entry && p.watch.length)
-                  edit((x) => ({ ...x, watch: x.watch.slice(0, -1) }));
-              }}
-              onBlur={() => addWatch(entry)}
-              className="mono h-6 min-w-[160px] flex-1 bg-transparent px-1 text-[13px] uppercase outline-none placeholder:normal-case placeholder:text-muted"
+        <div className="space-y-5">
+          <Card>
+            <CardHeader
+              title={
+                <>
+                  <Step n={2} />
+                  Topics you cover
+                </>
+              }
+              sub="News on your clients’ holdings is always included. These topics add wider industry news to the brief."
+              right={
+                p.sectors.length ? (
+                  <TextLink onClick={() => edit((x) => ({ ...x, sectors: [] }))}>Clear ({p.sectors.length})</TextLink>
+                ) : null
+              }
             />
-          </div>
-          <p id="watch-help" className={`mt-1.5 text-[12px] ${entryError ? 'text-down' : 'text-muted'}`}>
-            {entryError ||
-              'Press Enter or comma to add. Changing topics or this list rebuilds today’s brief, so saving takes a little longer.'}
-          </p>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader
-          title={
-            <>
-              <Step n={3} />
-              Brief filters
-              <span className="ml-2 text-[12px] font-normal text-muted">optional</span>
-            </>
-          }
-          sub="Narrow the headlines on the main brief. Leave both empty to see everything."
-          right={
-            p.focusTopics.length || chosenStocks.length ? (
-              <TextLink onClick={() => edit((x) => ({ ...x, focusTopics: [], focusSymbols: [] }))}>
-                Clear filters
-              </TextLink>
-            ) : null
-          }
-        />
-        <CardBody className="space-y-5">
-          <div>
-            <p className="eyebrow mb-2">
-              Only these topics · {p.focusTopics.length ? p.focusTopics.length + ' chosen' : 'showing all'}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {TOPICS.map((t) => (
-                <Chip
-                  key={t}
-                  disabled={saving}
-                  selected={p.focusTopics.includes(t)}
-                  onClick={() => edit((x) => ({ ...x, focusTopics: toggle(x.focusTopics, t) }))}
-                >
-                  {t}
-                </Chip>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="eyebrow mb-2">
-              Only these stocks · {chosenStocks.length ? chosenStocks.length + ' chosen' : 'showing all'}
-            </p>
-            {stocks.length ? (
+            <CardBody>
               <div className="flex flex-wrap gap-2">
-                {stocks.map((s) => (
+                {TOPICS.map((t) => (
                   <Chip
-                    key={s}
+                    key={t}
                     disabled={saving}
-                    selected={chosenStocks.includes(s)}
-                    onClick={() => edit((x) => ({ ...x, focusSymbols: toggle(chosenStocks, s) }))}
+                    selected={p.sectors.includes(t)}
+                    onClick={() => edit((x) => ({ ...x, sectors: toggle(x.sectors, t) }))}
                   >
-                    <span className="mono">{s}</span>
+                    {t}
                   </Chip>
                 ))}
               </div>
-            ) : (
-              <p className="text-[13px] text-muted">The chosen clients have no holdings on record.</p>
-            )}
-            {p.focusSymbols.length > chosenStocks.length ? (
-              <p className="mt-2 text-[12px] text-muted">
-                Stocks held only by clients you unticked were removed from this filter.
+              <label htmlFor="watch" className="mt-5 block text-[13px] font-medium text-ink">
+                Extra stocks to watch{' '}
+                <span className="num font-normal text-muted">
+                  ({p.watch.length}/{MAX_WATCH})
+                </span>
+              </label>
+              <div className="mt-2 flex min-h-9 flex-wrap items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-2 py-1.5 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-100">
+                {p.watch.map((s) => (
+                  <span
+                    key={s}
+                    className="mono inline-flex h-6 items-center gap-1 rounded-md border border-line-strong bg-sunken pl-2 pr-1 text-[12px] font-semibold text-ink"
+                  >
+                    {s}
+                    <button
+                      type="button"
+                      aria-label={'Remove ' + s}
+                      disabled={saving}
+                      onClick={() => edit((x) => ({ ...x, watch: x.watch.filter((w) => w !== s) }))}
+                      className="rounded p-0.5 text-muted hover:bg-line hover:text-ink"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  id="watch"
+                  value={entry}
+                  disabled={saving}
+                  maxLength={80}
+                  aria-invalid={Boolean(entryError)}
+                  aria-describedby="watch-help"
+                  placeholder={p.watch.length ? 'Add another…' : 'Type a ticker and press Enter'}
+                  onChange={(e) => {
+                    setEntryError('');
+                    if (/[\s,]$/.test(e.target.value)) addWatch(e.target.value);
+                    else setEntry(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addWatch(entry);
+                    } else if (e.key === 'Backspace' && !entry && p.watch.length)
+                      edit((x) => ({ ...x, watch: x.watch.slice(0, -1) }));
+                  }}
+                  onBlur={() => addWatch(entry)}
+                  className="mono h-6 min-w-[160px] flex-1 bg-transparent px-1 text-[13px] uppercase outline-none placeholder:normal-case placeholder:text-muted"
+                />
+              </div>
+              <p id="watch-help" className={`mt-1.5 text-[12px] ${entryError ? 'text-down' : 'text-muted'}`}>
+                {entryError ||
+                  'Press Enter or comma to add. Changing topics or this list rebuilds today’s brief, so saving takes a little longer.'}
               </p>
-            ) : null}
-          </div>
-        </CardBody>
-      </Card>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader
+              title={
+                <>
+                  <Step n={3} />
+                  Brief filters
+                  <span className="ml-2 text-[12px] font-normal text-muted">optional</span>
+                </>
+              }
+              sub="Narrow the headlines on the main brief. Leave both empty to see everything."
+              right={
+                p.focusTopics.length || chosenStocks.length ? (
+                  <TextLink onClick={() => edit((x) => ({ ...x, focusTopics: [], focusSymbols: [] }))}>
+                    Clear filters
+                  </TextLink>
+                ) : null
+              }
+            />
+            <CardBody className="space-y-5">
+              <div>
+                <p className="eyebrow mb-2">
+                  Only these topics · {p.focusTopics.length ? p.focusTopics.length + ' chosen' : 'showing all'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {TOPICS.map((t) => (
+                    <Chip
+                      key={t}
+                      disabled={saving}
+                      selected={p.focusTopics.includes(t)}
+                      onClick={() => edit((x) => ({ ...x, focusTopics: toggle(x.focusTopics, t) }))}
+                    >
+                      {t}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="eyebrow mb-2">
+                  Only these stocks · {chosenStocks.length ? chosenStocks.length + ' chosen' : 'showing all'}
+                </p>
+                {stocks.length ? (
+                  <div className="flex flex-wrap gap-2">
+                    {stocks.map((s) => (
+                      <Chip
+                        key={s}
+                        disabled={saving}
+                        selected={chosenStocks.includes(s)}
+                        onClick={() => edit((x) => ({ ...x, focusSymbols: toggle(chosenStocks, s) }))}
+                      >
+                        <span className="mono">{s}</span>
+                      </Chip>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[13px] text-muted">The chosen clients have no holdings on record.</p>
+                )}
+                {p.focusSymbols.length > chosenStocks.length ? (
+                  <p className="mt-2 text-[12px] text-muted">
+                    Stocks held only by clients you unticked were removed from this filter.
+                  </p>
+                ) : null}
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      </div>
 
       <p className="text-[12px] text-muted">All report dates and times use US Eastern Time.</p>
 

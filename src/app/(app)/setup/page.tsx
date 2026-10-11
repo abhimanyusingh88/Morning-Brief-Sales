@@ -16,7 +16,7 @@ export default async function Page() {
     getFocus(db, me.id),
   ]);
   return (
-    <div className="mx-auto max-w-[760px] space-y-6">
+    <div className="space-y-6">
       <PageHeader
         eyebrow="Account"
         title="Brief setup"
