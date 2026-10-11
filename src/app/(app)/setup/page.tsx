@@ -22,13 +22,7 @@ export default async function Page() {
         title="Brief setup"
         description="Choose the clients, topics and stocks your brief shows. The full brief is still prepared and saved for your whole book; these choices decide what you see."
       />
-      <SetupForm
-        key={JSON.stringify([prefs, focus])}
-        prefs={prefs}
-        focus={focus}
-        clients={book.clients}
-        holdings={book.holdings}
-      />
+      <SetupForm prefs={prefs} focus={focus} clients={book.clients} holdings={book.holdings} />
     </div>
   );
 }
