@@ -23,10 +23,11 @@ export default async function Page({
   const today = businessDate(),
     day = p.get('date') || today;
   if (!validDay(day) || day > today) notFound();
-  const history = await listHistory(db, me.id, client);
+  // History is independent of the brief itself, so it loads alongside it rather than before it.
+  const historyLoad = listHistory(db, me.id, client);
   // A past day shows its published brief and the charts and calendar saved that day, never today's quotes.
   if (day < today) {
-    const report = await getDayReport(db, me.id, client, day),
+    const [report, history] = await Promise.all([getDayReport(db, me.id, client, day), historyLoad]),
       held = report?.holdings ?? coverage.holdings.filter((h) => !client || h.clientId === client);
     const market = await pastPanels(
       db,
@@ -51,7 +52,11 @@ export default async function Page({
   const symbols = [...new Set(coverage.holdings.filter((h) => !client || h.clientId === client).map((h) => h.symbol))];
   // Public market data only: symbols are sent to the quote provider, never client names or positions.
   // Live panels are saved as fetched; a failed source falls back to today's last saved copy.
-  const [report, market] = await Promise.all([getReport(db, me.id, client), livePanels(db, me.id, symbols)]);
+  const [report, market, history] = await Promise.all([
+    getReport(db, me.id, client),
+    livePanels(db, me.id, symbols),
+    historyLoad,
+  ]);
   return (
     <BriefView
       report={report}

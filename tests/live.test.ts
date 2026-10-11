@@ -912,6 +912,24 @@ describe('brief history', () => {
       await db.asService((q) => q('insert into live_coverage values($1,$2)', [a, client]));
     }
   });
+  it('keeps a past day in history, as published, after one of its clients is retired', async () => {
+    const { listHistory, getDayReport } = await import('../src/lib/live/reports');
+    const client = uid('live:client:Z Investments');
+    const set = (ids: string[], active: boolean) =>
+      db.asService(async (q) => {
+        await q('update live_reports set input_client_ids=$1::uuid[] where id=$2', [ids, id]);
+        await q('update live_clients set active=$1 where id=$2', [active, client]);
+      });
+    await set([client], false);
+    try {
+      expect((await listHistory(db, a, null)).some((d) => d.id === id)).toBe(true);
+      const r = (await getDayReport(db, a, null, '2026-10-01'))!;
+      expect(r.holdings.some((h) => h.clientId === client)).toBe(true);
+      expect((await listHistory(db, b, null)).some((d) => d.id === id)).toBe(false);
+    } finally {
+      await set([], true);
+    }
+  });
   it('answers chat from a past brief and lists that day’s conversations', async () => {
     const { POST } = await import('../src/app/api/live/chat/route');
     const { GET } = await import('../src/app/api/live/threads/route');

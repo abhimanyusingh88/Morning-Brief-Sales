@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { getDb } from '../db';
 import { uid } from '../util/id';
@@ -91,8 +92,9 @@ export async function loadMe(profileId: string): Promise<Me | null> {
 /**
  * No sign-in screen: requests without a session use the demo desk profile. A signed session (for example a
  * future SSO hand-off) still selects its own profile. Every query stays scoped by database RLS either way.
+ * Shared within one render, so the layout and the page read the profile once.
  */
-export async function getMe(): Promise<Me | null> {
+export const getMe = cache(async (): Promise<Me | null> => {
   let id: string | null = null;
   try {
     id = verifySession((await cookies()).get(COOKIE)?.value);
@@ -100,7 +102,7 @@ export async function getMe(): Promise<Me | null> {
     id = null;
   }
   return (id ? await loadMe(id) : null) ?? loadMe(DEMO_PROFILE_ID);
-}
+});
 export function meFromRequest(req: Request): string | null {
   const m = /(?:^|;\s*)mb_session=([^;]+)/.exec(req.headers.get('cookie') ?? '');
   return verifySession(m?.[1]) ?? DEMO_PROFILE_ID;

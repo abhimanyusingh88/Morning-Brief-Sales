@@ -403,8 +403,15 @@ export async function getArchivedReport(
   if (!row) return null;
   const payload = { ...(row.payload as Omit<Report, 'id'>), id: String(row.id), archived: true } as Report;
   if (payload.clientId !== clientId) return null;
+  // A day whose final brief was published before its wrap was ready still shows the wrap saved for that day.
+  if (!payload.desk) payload.desk = await db.asUser(profileId, (q) => latestDesk(q, payload.businessDate));
   const covered = new Set((await getCoverage(db, profileId)).clients.map((c) => c.id)),
     held = [...new Set(payload.holdings.map((h) => h.clientId))];
+  // A client retired from the book since then stays in the snapshot; only revoked coverage is narrowed away.
+  const retired = await db.asUser(profileId, (q) =>
+    q('select cid from unnest($1::uuid[]) cid where app.client_retired(cid)', [held]),
+  );
+  for (const r of retired) covered.add(String(r.cid));
   if (held.every((c) => covered.has(c))) return payload;
   if (clientId) return null;
   const narrowed = narrowReport(

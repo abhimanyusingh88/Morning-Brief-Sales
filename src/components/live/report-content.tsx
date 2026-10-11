@@ -376,7 +376,9 @@ export function ReportContent({ report, filters, market }: { report: Report; fil
               </div>
             ) : (
               <p className="text-sm text-muted">
-                The market wrap is prepared after the first source refresh of the session.
+                {report.archived
+                  ? 'No market wrap was saved for this day.'
+                  : 'The market wrap is prepared after the first source refresh of the session.'}
               </p>
             )}
           </Section>
