@@ -20,7 +20,10 @@ export async function enqueue(q: Q, kind: Job['kind'], key: string, payload: Rec
     JSON.stringify(payload),
   ]);
 }
-/** manual: a person pressed Refresh, so every source is re-checked in its own one-minute slot. */
+/**
+ * manual: a person pressed Refresh, so every source is re-checked in its own one-minute slot. A source that is
+ * still waiting from an earlier press is not queued again, so repeated presses drain the queue instead of growing it.
+ */
 export async function reconcile(db: Db, now = new Date(), manual = false) {
   const date = businessDate(now),
     slot = Math.floor(now.getTime() / 300000);
@@ -33,12 +36,26 @@ export async function reconcile(db: Db, now = new Date(), manual = false) {
     await q(
       "update live_jobs set status='failed',error_code='RETRY_EXHAUSTED',finished_at=now() where attempts>=3 and (status='queued' or (status='running' and lease_until<now()))",
     );
+    // Coalesce unstarted older slots. Current slot reconciles all sources rather than replaying stale market fetches.
+    // This runs first, so a stale request can never stand in for the fresh one a manual refresh is about to queue.
+    await q(
+      "update live_jobs set status='done',finished_at=now(),error_code='SUPERSEDED' where status='queued' and created_at<now()-interval '40 minutes' and kind in('market','news')",
+    );
+    const waiting = manual
+      ? await q<{ kind: string; source: string | null }>(
+          "select kind,payload->>'source' source from live_jobs where kind in('market','news') and attempts<3 and payload->>'date'=$1 and (status='queued' or (status='running' and lease_until>now()))",
+          [date],
+        )
+      : [];
+    const queued = (kind: string, source?: string) =>
+      waiting.some((w) => w.kind === kind && (source === undefined || w.source === source));
     for (const source of MARKET_SOURCES)
-      await enqueue(q, 'market', date + ':market:' + source + ':' + key, { source, date });
+      if (!queued('market', source))
+        await enqueue(q, 'market', date + ':market:' + source + ':' + key, { source, date });
     const universe = await q<{ symbol: string }>(
       'select distinct h.symbol from live_holdings h join live_accounts a on a.id=h.account_id join live_clients c on c.id=a.client_id where h.active and a.active and c.active order by h.symbol',
     );
-    if (universe.length)
+    if (universe.length && !queued('news'))
       await enqueue(
         q,
         'news',
@@ -50,10 +67,6 @@ export async function reconcile(db: Db, now = new Date(), manual = false) {
           discoverySlot,
         },
       );
-    // Coalesce unstarted older slots. Current slot reconciles all sources rather than replaying stale market fetches.
-    await q(
-      "update live_jobs set status='done',finished_at=now(),error_code='SUPERSEDED' where status='queued' and created_at<now()-interval '40 minutes' and kind in('market','news')",
-    );
   });
 }
 export async function claim(db: Db, kinds: Job['kind'][] = ['market', 'news', 'publish']): Promise<Job | null> {
@@ -157,7 +170,14 @@ export async function runJob(db: Db, job: Job, signal: AbortSignal, now = new Da
             .slice(0, 40)
         : [];
       const result = await collectNews(symbols, signal, now, useAI);
-      await commitJob(db, job, (q) => saveNews(q, result));
+      await commitJob(db, job, async (q) => {
+        await saveNews(q, result);
+        // This collection read every feed as of now, so news requests queued before it started are already served.
+        await q(
+          "update live_jobs set status='done',finished_at=now(),error_code='SUPERSEDED' where kind='news' and status='queued' and id<>$1 and created_at<$2",
+          [job.id, now.toISOString()],
+        );
+      });
     } catch {
       await db.asService((q) =>
         sourceCheck(q, 'news', false, 0, signal.aborted ? 'DISCOVERY_TIMEOUT' : 'DISCOVERY_UNAVAILABLE'),
@@ -180,34 +200,39 @@ export async function refresh(
   // Source work stops early enough to leave this long for publishing, so every refresh ends with a saved brief.
   const reserve = opts.profileId ? 22000 : 30000,
     left = () => deadline - Date.now() - reserve;
-  // Market source requests run in small batches; a news discovery is shared across the entire book.
-  for (let round = 0; round < 5 && left() > 5000; round++) {
+  const kinds = opts.kinds ?? (['market', 'news', 'publish'] as Job['kind'][]);
+  const run = async (job: Job) => {
+    try {
+      await runJob(
+        db,
+        job,
+        AbortSignal.timeout(Math.max(1000, Math.min(job.kind === 'news' ? 100000 : 12000, left()))),
+        new Date(),
+        opts.discovery !== false,
+      );
+      completed++;
+    } catch {
+      await failJob(db, job, 'SOURCE_OR_EXECUTION_FAILED');
+      failed++;
+    }
+  };
+  // News is one long job shared across the whole book. It starts first and runs alongside the market batches, so a
+  // short refresh can never spend its whole budget on market sources and leave the news waiting.
+  const newsJob = kinds.includes('news') && left() > 5000 ? await claim(db, ['news']) : null;
+  const news = newsJob ? run(newsJob) : Promise.resolve();
+  const rest = kinds.filter((k) => k !== 'news');
+  // Market source requests run in small batches.
+  for (let round = 0; rest.length && round < 6 && left() > 5000; round++) {
     const jobs: Job[] = [];
     for (let i = 0; i < 3; i++) {
-      const job = await claim(db, opts.kinds);
+      const job = await claim(db, rest);
       if (!job) break;
       jobs.push(job);
-      if (job.kind === 'news') break;
     }
     if (!jobs.length) break;
-    await Promise.all(
-      jobs.map(async (job) => {
-        try {
-          await runJob(
-            db,
-            job,
-            AbortSignal.timeout(Math.max(1000, Math.min(job.kind === 'news' ? 100000 : 12000, left()))),
-            new Date(),
-            opts.discovery !== false,
-          );
-          completed++;
-        } catch {
-          await failJob(db, job, 'SOURCE_OR_EXECUTION_FAILED');
-          failed++;
-        }
-      }),
-    );
+    await Promise.all(jobs.map(run));
   }
+  await news;
   // Publication reads persisted verified evidence; source failures cannot replace it with invented values.
   // The desk model gets what time remains; if it runs out, the template note is used and a full run upgrades it.
   await publishReports(db, new Date(), {

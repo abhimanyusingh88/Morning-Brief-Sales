@@ -1,7 +1,17 @@
 import { redirect, notFound } from 'next/navigation';
 import { getMe } from '@/lib/auth/session';
 import { getDb } from '@/lib/db';
-import { getCoverage, getDayReport, getReport, listHistory, parseFilters, validDay, validId } from '@/lib/live/reports';
+import {
+  focusCoverage,
+  getCoverage,
+  getDayReport,
+  getFocus,
+  getReport,
+  listHistory,
+  parseFilters,
+  validDay,
+  validId,
+} from '@/lib/live/reports';
 import { businessDate } from '@/lib/live/time';
 import { livePanels, pastPanels } from '@/lib/live/snapshots';
 import { BriefView } from '@/components/live/brief-view';
@@ -18,7 +28,8 @@ export default async function Page({
   const p = new URLSearchParams(Object.entries(raw).filter((e): e is [string, string] => typeof e[1] === 'string'));
   const client = p.get('client') || null;
   const db = await getDb();
-  const coverage = await getCoverage(db, me.id);
+  // The brief shows the clients chosen in brief setup; the published brief itself still covers the whole book.
+  const coverage = focusCoverage(await getCoverage(db, me.id), await getFocus(db, me.id));
   if (client && (!validId(client) || !coverage.clients.some((c) => c.id === client))) notFound();
   const today = businessDate(),
     day = p.get('date') || today;

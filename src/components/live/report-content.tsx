@@ -148,39 +148,75 @@ function StoryLink({ story, children }: { story?: Story; children: React.ReactNo
     <>{children}</>
   );
 }
+/** The day's five biggest gainers and five biggest decliners among the held stocks, by move versus prior close. */
 function BookMovers({ report, movers, stories }: { report: Report; movers: Series[]; stories: Story[] }) {
-  const rows = report.holdings.map((h) => ({
-    h,
-    s: movers.find((m) => m.symbol === h.symbol),
-    n: stories.filter((a) => a.matches.some((m) => m.symbol === h.symbol && m.clientId === h.clientId)),
-    top: stories.find((a) => a.category === 'company' && a.symbols.includes(h.symbol)),
-  }));
-  rows.sort((a, b) => Math.abs(b.s?.changePct ?? 0) - Math.abs(a.s?.changePct ?? 0));
+  const rows = report.holdings
+    .map((h) => ({
+      h,
+      s: movers.find((m) => m.symbol === h.symbol),
+      n: stories.filter((a) => a.matches.some((m) => m.symbol === h.symbol && m.clientId === h.clientId)),
+      top: stories.find((a) => a.category === 'company' && a.symbols.includes(h.symbol)),
+    }))
+    .filter((r) => r.s?.changePct != null);
+  const move = (r: (typeof rows)[number]) => r.s!.changePct!;
+  const groups = [
+    {
+      label: 'Top gainers',
+      rows: rows
+        .filter((r) => move(r) > 0)
+        .sort((x, y) => move(y) - move(x))
+        .slice(0, 5),
+    },
+    {
+      label: 'Top decliners',
+      rows: rows
+        .filter((r) => move(r) < 0)
+        .sort((x, y) => move(x) - move(y))
+        .slice(0, 5),
+    },
+  ].filter((g) => g.rows.length);
+  if (!groups.length)
+    return (
+      <p className="px-4 py-6 text-xs text-muted">
+        {report.archived
+          ? 'No price moves were saved for these holdings on this day.'
+          : movers.length
+            ? 'None of these holdings has moved from its prior close yet.'
+            : 'Price data for these holdings is unavailable right now. Refresh to try again; no values are estimated.'}
+      </p>
+    );
+  const HEAD = ['Client', 'Stock', 'Position', 'Last', 'Day', 'Intraday', 'Stories', 'Lead headline'];
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[820px] text-xs">
+      <table className="w-full min-w-[760px] text-xs">
         <thead className="bg-sunken/60">
           <tr>
-            {['Client', 'Stock', 'Position', 'Last', 'Day', 'For position', 'Intraday', 'Stories', 'Lead headline'].map(
-              (h, i) => (
-                <th
-                  key={h}
-                  scope="col"
-                  className={
-                    'px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted ' +
-                    ([3, 4, 7].includes(i) ? 'text-right' : 'text-left')
-                  }
-                >
-                  {h}
-                </th>
-              ),
-            )}
+            {HEAD.map((h, i) => (
+              <th
+                key={h}
+                scope="col"
+                className={
+                  'px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted ' +
+                  ([3, 4, 6].includes(i) ? 'text-right' : 'text-left')
+                }
+              >
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-line">
-          {rows.map(({ h, s, n, top }) => {
-            const effect = s?.changePct == null ? null : s.changePct * (h.direction === 'Long' ? 1 : -1);
-            return (
+        {groups.map((g) => (
+          <tbody key={g.label} className="divide-y divide-line">
+            <tr className="bg-sunken/30">
+              <th
+                scope="rowgroup"
+                colSpan={HEAD.length}
+                className="px-3 py-1.5 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-navy"
+              >
+                {g.label}
+              </th>
+            </tr>
+            {g.rows.map(({ h, s, n, top }) => (
               <tr key={h.id} className="hover:bg-sunken/40">
                 <td className="px-3 py-2">
                   <p className="font-semibold">{h.client}</p>
@@ -196,24 +232,6 @@ function BookMovers({ report, movers, stories }: { report: Report; movers: Serie
                 <td className={'num px-3 text-right font-semibold ' + tone(s?.changePct)}>
                   {pct(s?.changePct ?? null)}
                 </td>
-                <td className="px-3">
-                  {effect == null ? (
-                    <span className="text-muted">—</span>
-                  ) : (
-                    <span
-                      className={
-                        'rounded px-1.5 py-0.5 text-[10px] font-semibold ' +
-                        (Math.abs(effect) < 0.005
-                          ? 'bg-sunken text-ink-2'
-                          : effect > 0
-                            ? 'bg-up-50 text-up'
-                            : 'bg-down-50 text-down')
-                      }
-                    >
-                      {Math.abs(effect) < 0.005 ? 'Flat' : effect > 0 ? 'Favourable' : 'Adverse'}
-                    </span>
-                  )}
-                </td>
                 <td className="px-3">{s ? <Sparkline points={s.points} previousClose={s.previousClose} /> : null}</td>
                 <td className="num px-3 text-right">{n.length}</td>
                 <td className="max-w-[320px] px-3 py-2">
@@ -224,9 +242,9 @@ function BookMovers({ report, movers, stories }: { report: Report; movers: Serie
                   </StoryLink>
                 </td>
               </tr>
-            );
-          })}
-        </tbody>
+            ))}
+          </tbody>
+        ))}
       </table>
       {movers.length ? (
         <p className="border-t border-line px-3 py-2 text-[10px] text-muted">
@@ -237,7 +255,7 @@ function BookMovers({ report, movers, stories }: { report: Report; movers: Serie
               .sort()
               .at(-1)!,
           )}{' '}
-          · Stock moves in percent versus prior close. “For position” applies the long/short sign; it is not P&amp;L.
+          · Stock moves in percent versus prior close.
         </p>
       ) : null}
     </div>
@@ -493,7 +511,9 @@ export function ReportContent({ report, filters, market }: { report: Report; fil
           id="client-book"
           title="Your book today"
           right={
-            <span className="text-[11px] text-muted">{report.holdings.length} positions · sorted by size of move</span>
+            <span className="text-[11px] text-muted">
+              Top 5 gainers and top 5 decliners of {report.holdings.length} positions
+            </span>
           }
         >
           <Card className="overflow-hidden">

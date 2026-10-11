@@ -20,13 +20,14 @@ export async function storedPanels(
   profileId: string,
   date: string,
   keys: string[],
+  maxAgeSeconds?: number,
 ): Promise<Map<string, Series | Calendar>> {
   if (!keys.length) return new Map();
   const rows = await db.asUser(profileId, (q) =>
-    q('select key,payload,fetched_at from live_market_snapshots where business_date=$1 and key=any($2::text[])', [
-      date,
-      keys,
-    ]),
+    q(
+      'select key,payload from live_market_snapshots where business_date=$1 and key=any($2::text[]) and ($3::int is null or fetched_at>now()-make_interval(secs=>$3::int))',
+      [date, keys, maxAgeSeconds ?? null],
+    ),
   );
   return new Map(rows.map((r) => [String(r.key), r.payload as Series | Calendar]));
 }
@@ -43,6 +44,7 @@ async function fetchAndSave(db: Db, list: string[], date: string, now: Date) {
   ]);
   return { overnight, movers, calendar };
 }
+const FRESH_SECONDS = 180;
 const keysFor = (symbols: string[]) => ({
   overnight: OVERNIGHT.map((o) => 'overnight:' + o.symbol),
   movers: symbols.map((s) => 'mover:' + s),
@@ -51,6 +53,19 @@ const keysFor = (symbols: string[]) => ({
 export async function livePanels(db: Db, profileId: string, symbols: string[], now = new Date()): Promise<MarketPanel> {
   const date = businessDate(now),
     list = [...new Set(symbols)].slice(0, 40);
+  // Charts are five- and fifteen-minute bars, so a copy saved in the last few minutes is as current as a new fetch.
+  // Opening the page then costs one database read instead of a request per chart; Refresh always saves new copies.
+  const k = keysFor(list),
+    wanted = [...k.overnight, ...k.movers, 'calendar'];
+  const recent = await storedPanels(db, profileId, date, wanted, FRESH_SECONDS).catch(
+    () => new Map<string, Series | Calendar>(),
+  );
+  if (wanted.every((x) => recent.has(x)))
+    return {
+      overnight: k.overnight.map((x) => recent.get(x) as Series),
+      movers: k.movers.map((x) => recent.get(x) as Series),
+      calendar: recent.get('calendar') as Calendar,
+    };
   const { overnight, movers, calendar } = await fetchAndSave(db, list, date, now);
   const missing = [
     ...overnight.flatMap((s, i) => (s ? [] : ['overnight:' + OVERNIGHT[i].symbol])),

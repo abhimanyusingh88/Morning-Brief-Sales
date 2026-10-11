@@ -332,6 +332,26 @@ describe('durable jobs', () => {
     expect(r.backed_off).toBe(true);
     await db.asService((q) => q("update live_jobs set status='done' where id=$1", [first.id]));
   });
+  it('does not queue a source twice on repeated manual refreshes, and news never waits behind market work', async () => {
+    const { reconcile } = await import('../src/lib/live/jobs');
+    const open = () =>
+      db.asService((q) =>
+        q<{ kind: string; n: number }>(
+          "select kind,count(*)::int n from live_jobs where status='queued' and kind in('market','news') group by kind",
+        ),
+      );
+    await db.asService((q) => q("update live_jobs set status='done' where status in('queued','running')"));
+    const t = new Date();
+    await reconcile(db, t, true);
+    const first = await open();
+    await reconcile(db, new Date(t.getTime() + 61000), true);
+    expect(await open()).toEqual(first);
+    expect(first.find((r) => r.kind === 'news')?.n).toBe(1);
+    expect(first.find((r) => r.kind === 'market')!.n).toBeGreaterThan(3);
+    const news = await claim(db, ['news']);
+    expect(news?.kind).toBe('news');
+    await db.asService((q) => q("update live_jobs set status='done' where status in('queued','running')"));
+  });
 });
 describe('analyst threads', () => {
   it('keeps each conversation separate and private to its owner', async () => {
@@ -929,6 +949,37 @@ describe('brief history', () => {
     } finally {
       await set([], true);
     }
+  });
+  it('shows only the clients chosen in brief setup while the saved brief keeps the whole book', async () => {
+    const { getCoverage, getFocus, focusCoverage, getDayReport, getArchivedReport } =
+      await import('../src/lib/live/reports');
+    const book = await getCoverage(db, a);
+    expect(book.clients.length).toBeGreaterThan(1);
+    const keep = book.clients[0].id;
+    const setFocus = (ids: string[]) =>
+      db.asUser(a, (q) =>
+        q(
+          'insert into live_preferences(profile_id,focus_clients) values($1,$2::uuid[]) on conflict(profile_id) do update set focus_clients=excluded.focus_clients',
+          [a, ids],
+        ),
+      );
+    const whole = (await getArchivedReport(db, a, null, id))!;
+    expect(new Set(whole.holdings.map((h) => h.clientId)).size).toBeGreaterThan(1);
+    await setFocus([keep, uid('not-a-covered-client')]);
+    try {
+      const focus = await getFocus(db, a);
+      expect(focus.clients).toEqual([keep]);
+      expect(focusCoverage(book, focus).clients.map((c) => c.id)).toEqual([keep]);
+      const shown = (await getDayReport(db, a, null, '2026-10-01'))!;
+      expect(shown.id).toBe(id);
+      expect(shown.holdings.every((h) => h.clientId === keep)).toBe(true);
+      expect(shown.articles.every((s) => s.matches.every((m) => m.clientId === keep))).toBe(true);
+      const [stored] = await db.asService((q) => q('select payload from live_reports where id=$1', [id]));
+      expect((stored.payload as { holdings: unknown[] }).holdings.length).toBe(whole.holdings.length);
+    } finally {
+      await setFocus([]);
+    }
+    expect((await getArchivedReport(db, a, null, id))!.holdings.length).toBe(whole.holdings.length);
   });
   it('answers chat from a past brief and lists that day’s conversations', async () => {
     const { POST } = await import('../src/app/api/live/chat/route');

@@ -1,7 +1,20 @@
 'use client';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Download, History, Info, Mail, RefreshCw, Search, Users, X } from 'lucide-react';
+import Link from 'next/link';
+import {
+  ArrowLeft,
+  Download,
+  History,
+  Info,
+  Loader2,
+  Mail,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Users,
+  X,
+} from 'lucide-react';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
@@ -11,7 +24,7 @@ import { ClientsDialog } from './clients-dialog';
 import { ReportContent, HoldingsTable, type MarketPanel } from './report-content';
 import { displayDay, stamp } from '@/lib/live/time';
 import { filterStories } from '@/lib/live/presentation';
-import { TOPICS, type Client, type Filters, type Holding, type Report } from '@/lib/live/types';
+import type { Client, Filters, Holding, Report } from '@/lib/live/types';
 import type { HistoryEntry } from '@/lib/live/reports';
 const SECTIONS = [
   ['today-news', 'Key events'],
@@ -70,7 +83,7 @@ export function BriefView({
   // Each call does a bounded slice of source work and publishes; keep going while sources are still queued.
   const refresh = async () => {
     setRefreshing(true);
-    setMessage('');
+    setMessage('Checking market data, news, charts and the calendar…');
     try {
       for (let step = 0; step < 6; step++) {
         const r = await fetch('/api/live/refresh', { method: 'POST', signal: AbortSignal.timeout(75000) });
@@ -78,7 +91,13 @@ export function BriefView({
         if (!r.ok) throw new Error(b.error ?? 'Refresh unavailable');
         router.refresh();
         if (!b.pending) break;
-        setMessage('Collecting sources… the brief updates as each step finishes.');
+        setMessage(
+          'Still collecting: ' +
+            b.pending +
+            ' source ' +
+            (b.pending === 1 ? 'check' : 'checks') +
+            ' left. The brief updates as each step finishes.',
+        );
         await new Promise((res) => setTimeout(res, 31000));
       }
       setMessage('Brief updated from available sources.');
@@ -131,7 +150,6 @@ export function BriefView({
     }
   };
   const current = clientId ? holdings.filter((h) => h.clientId === clientId) : holdings,
-    symbols = [...new Set(current.map((h) => h.symbol))].sort(),
     active = Boolean(filters.q || filters.topic || filters.symbol);
   const count = report ? filterStories(report, filters).length : 0;
   return (
@@ -273,25 +291,14 @@ export function BriefView({
               </kbd>
             </label>
           </form>
-          <Select
-            label="Topic"
-            value={filters.topic}
-            onChange={(v) => update('topic', v)}
-            disabled={pending}
-            className="w-[calc(50%-4px)] sm:w-40"
-            align="end"
-            options={[{ value: '', label: 'All topics' }, ...TOPICS.map((t) => ({ value: t, label: t }))]}
-          />
-          <Select
-            label="Stock"
-            value={filters.symbol}
-            onChange={(v) => update('symbol', v)}
-            disabled={pending}
-            searchable
-            className="w-[calc(50%-4px)] sm:w-36"
-            align="end"
-            options={[{ value: '', label: 'All stocks' }, ...symbols.map((s) => ({ value: s, label: s }))]}
-          />
+          <Link
+            href="/setup"
+            title="Choose clients, topics and stocks in Brief setup"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 text-[13px] font-medium text-ink-2 transition-colors hover:border-brand hover:text-brand"
+          >
+            <SlidersHorizontal size={14} />
+            Brief setup
+          </Link>
           {active ? (
             <button
               type="button"
@@ -339,6 +346,19 @@ export function BriefView({
           </div>
         </div>
       </div>
+      {pending || refreshing ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="overflow-hidden rounded-lg border border-line bg-surface shadow-card"
+        >
+          <div className="loading-bar" />
+          <p className="flex items-center gap-2 px-3.5 py-2 text-[12.5px] font-medium text-ink-2">
+            <Loader2 size={14} className="animate-spin text-brand" />
+            {refreshing ? 'Updating your brief from live sources…' : 'Loading…'}
+          </p>
+        </div>
+      ) : null}
       {message ? (
         <div
           role="status"
@@ -378,7 +398,7 @@ export function BriefView({
                   <>
                     <h2 className="text-sm font-semibold">Today’s brief isn’t published yet</h2>
                     <p className="mt-2 text-xs leading-relaxed text-muted">
-                      Refresh to prepare it from available sources. The scheduled run publishes it on weekday mornings.
+                      Refresh to prepare it from available sources. The scheduled run also publishes it through the day.
                     </p>
                     {latest ? (
                       <button

@@ -21,7 +21,7 @@
   "crons": [
     {
       "path": "/api/live/work",
-      "schedule": "15 13 * * 1-5"
+      "schedule": "15 13 * * *"
     }
   ]
 }

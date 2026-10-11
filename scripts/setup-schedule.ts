@@ -22,7 +22,16 @@ async function main() {
     body: '{}',
     headers: { 'Content-Type': 'application/json' },
   });
-  console.log('Configured idempotent pre-open and intraday refresh schedules.');
+  // Weekends: every two hours, so Saturday and Sunday still have a brief from the day's news.
+  await client.schedules.create({
+    destination: origin + '/api/live/work',
+    scheduleId: 'morning-brief-weekend',
+    cron: 'CRON_TZ=America/New_York 0 6-20/2 * * 0,6',
+    retries: 2,
+    body: '{}',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  console.log('Configured idempotent pre-open, intraday and weekend refresh schedules.');
 }
 main().catch(() => {
   console.error('Schedule setup failed. Check APP_URL and QStash credentials.');

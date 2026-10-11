@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { cache } from 'react';
 import type { Db, Q } from '../db/types';
 import { businessDate } from './time';
 import { COMPANIES } from './classify';
@@ -7,11 +8,13 @@ import {
   METRICS,
   type Article,
   type Client,
+  type Focus,
   type Holding,
   type Metric,
   type Preferences,
   type Report,
   type Story,
+  TOPICS,
 } from './types';
 export const hash = (x: unknown) => createHash('sha256').update(JSON.stringify(x)).digest('hex');
 export const validId = (s: string) => /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(s);
@@ -52,11 +55,65 @@ export function clientsFrom(h: Holding[]): Client[] {
     };
   });
 }
-export async function getCoverage(db: Db, profileId: string) {
+/** The whole assigned book. Shared within one render, so a page reads it once however many loaders need it. */
+export const getCoverage = cache(async (db: Db, profileId: string) => {
   return db.asUser(profileId, async (q) => {
     const h = await holdings(q);
     return { holdings: h, clients: clientsFrom(h), hash: hash(h) };
   });
+});
+export type Coverage = Awaited<ReturnType<typeof getCoverage>>;
+/** Brief setup choices, limited to clients the person still covers and stocks still in those clients' books. */
+export const getFocus = cache(async (db: Db, profileId: string): Promise<Focus> => {
+  const [r] = await db.asUser(profileId, (q) =>
+    q('select focus_clients,focus_topics,focus_symbols from live_preferences where profile_id=$1', [profileId]),
+  );
+  const book = await getCoverage(db, profileId);
+  const clients = ((r?.focus_clients as string[]) ?? []).filter((id) => book.clients.some((c) => c.id === id));
+  const held = new Set(
+    book.holdings.filter((h) => !clients.length || clients.includes(h.clientId)).map((h) => h.symbol),
+  );
+  return {
+    clients,
+    topics: ((r?.focus_topics as string[]) ?? []).filter((t) => (TOPICS as readonly string[]).includes(t)),
+    symbols: ((r?.focus_symbols as string[]) ?? []).filter((s) => held.has(s)),
+  };
+});
+/** The book as the brief shows it: only the clients chosen in brief setup, or everyone when none are chosen. */
+export function focusCoverage<T extends { holdings: Holding[]; clients: Client[] }>(book: T, focus: Focus): T {
+  if (!focus.clients.length) return book;
+  return {
+    ...book,
+    holdings: book.holdings.filter((h) => focus.clients.includes(h.clientId)),
+    clients: book.clients.filter((c) => focus.clients.includes(c.id)),
+  };
+}
+/**
+ * Applies brief setup to a published brief at read time. The stored brief keeps the whole book; clients that were
+ * not chosen, and stories outside the chosen topics or stocks, are left out of what is shown.
+ */
+export function focusReport(report: Report, focus: Focus): Report | null {
+  let r: Report | null = report;
+  if (focus.clients.length) {
+    if (report.clientId) {
+      if (!focus.clients.includes(report.clientId)) return null;
+    } else if (report.holdings.some((h) => !focus.clients.includes(h.clientId))) {
+      const kept = narrowReport(report, focus.clients);
+      // A past brief published before any chosen client was covered still opens, whole, rather than vanishing.
+      r = kept ?? report;
+    }
+  }
+  if (!focus.topics.length && !focus.symbols.length) return r;
+  return {
+    ...r,
+    articles: r.articles.filter(
+      (a) =>
+        (!focus.topics.length || a.topics.some((t) => focus.topics.includes(t))) &&
+        (!focus.symbols.length ||
+          a.symbols.some((s) => focus.symbols.includes(s)) ||
+          a.matches.some((m) => focus.symbols.includes(m.symbol))),
+    ),
+  };
 }
 const MACRO = ['Markets', 'Credit', 'Trade', 'Oil', 'Energy', 'Geopolitics', 'Rates', 'Regulation', 'Commodities'];
 const TOPIC_WEIGHT: Record<string, number> = {
@@ -363,8 +420,11 @@ export async function getReport(
   now = new Date(),
 ): Promise<Report | null> {
   if ((clientId && !validId(clientId)) || (reportId && !validId(reportId))) return null;
-  const c = await getCoverage(db, profileId);
-  const prefs = await getPreferences(db, profileId);
+  const [c, prefs, focus] = await Promise.all([
+    getCoverage(db, profileId),
+    getPreferences(db, profileId),
+    getFocus(db, profileId),
+  ]);
   return db.asUser(profileId, async (q) => {
     const rows = reportId
       ? await q('select id,payload from live_reports where id=$1 and profile_id=$2', [reportId, profileId])
@@ -377,7 +437,7 @@ export async function getReport(
     const payload = r.payload as Omit<Report, 'id'>;
     if (payload.coverageHash !== c.hash || hash(payload.preferences) !== hash(prefs) || payload.clientId !== clientId)
       return null;
-    return { ...payload, id: String(r.id) };
+    return focusReport({ ...payload, id: String(r.id) }, focus);
   });
 }
 export type HistoryEntry = { id: string; businessDate: string; cutoff: string; stories: number };
@@ -412,13 +472,14 @@ export async function getArchivedReport(
     q('select cid from unnest($1::uuid[]) cid where app.client_retired(cid)', [held]),
   );
   for (const r of retired) covered.add(String(r.cid));
-  if (held.every((c) => covered.has(c))) return payload;
+  const focus = await getFocus(db, profileId);
+  if (held.every((c) => covered.has(c))) return focusReport(payload, focus);
   if (clientId) return null;
   const narrowed = narrowReport(
     payload,
     held.filter((c) => covered.has(c)),
   );
-  return narrowed ? { ...narrowed, clientName: payload.clientName } : null;
+  return narrowed ? focusReport({ ...narrowed, clientName: payload.clientName }, focus) : null;
 }
 /** The final published brief for one past business day and client scope. */
 export async function getDayReport(

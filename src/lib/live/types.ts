@@ -55,6 +55,9 @@ export type Story = Article & {
 };
 export type Client = { id: string; name: string; accounts: number; holdings: number; symbols: string[] };
 export type Preferences = { sectors: string[]; symbols: string[]; timezone: string };
+/** Brief setup display choices. They narrow what is shown, never what is published; an empty list shows everything. */
+export type Focus = { clients: string[]; topics: string[]; symbols: string[] };
+export const NO_FOCUS: Focus = { clients: [], topics: [], symbols: [] };
 export type Report = {
   id: string;
   profileId: string;
