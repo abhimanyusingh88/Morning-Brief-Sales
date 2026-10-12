@@ -161,14 +161,14 @@ function BookMovers({ report, movers, stories }: { report: Report; movers: Serie
   const move = (r: (typeof rows)[number]) => r.s!.changePct!;
   const groups = [
     {
-      label: 'Top gainers',
+      label: 'Top Performers',
       rows: rows
         .filter((r) => move(r) > 0)
         .sort((x, y) => move(y) - move(x))
         .slice(0, 5),
     },
     {
-      label: 'Top decliners',
+      label: 'Bottom Performers',
       rows: rows
         .filter((r) => move(r) < 0)
         .sort((x, y) => move(x) - move(y))
