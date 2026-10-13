@@ -156,6 +156,24 @@ describe('charts, calendar and email', () => {
     expect(c.events).toHaveLength(1);
     expect(c.events[0].forecast).toBe('47.6');
   });
+  it('never fills an empty day from later in the week, and trims saved copies to the day', async () => {
+    const { calendarFor } = await import('../src/lib/live/intraday');
+    const later = { title: 'FOMC Member Speaks', country: 'USD', date: '2026-10-15T12:10:00-04:00', impact: 'High' };
+    const twice = { title: 'CPI m/m', country: 'USD', date: '2026-10-09T08:30:00-04:00', impact: 'High' };
+    const c = parseCalendar(JSON.stringify([later, twice, twice, { ...twice, title: '' }]), now);
+    expect(c.events.map((e) => e.title)).toEqual(['CPI m/m']);
+    const quiet = parseCalendar(JSON.stringify([later]), now);
+    expect(quiet.scope).toBe('today');
+    expect(quiet.events).toEqual([]);
+    const old = {
+      ...c,
+      scope: 'week' as const,
+      events: [...c.events, { ...c.events[0], time: '2026-10-15T16:10:00.000Z' }],
+    };
+    expect(calendarFor(old, '2026-10-09').events).toHaveLength(1);
+    expect(calendarFor(old, '2026-10-09').scope).toBe('today');
+    expect(calendarFor(null, '2026-10-09')).toBeNull();
+  });
   it('sends only on weekdays from the configured time', () => {
     expect(dueToSend(new Date('2026-10-09T13:29:00Z'))).toBe(false);
     expect(dueToSend(new Date('2026-10-09T13:31:00Z'))).toBe(true);

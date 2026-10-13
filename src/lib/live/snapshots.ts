@@ -1,6 +1,14 @@
 import type { Db } from '../db/types';
 import { businessDate } from './time';
-import { getCalendar, getSeries, getSeriesForDay, OVERNIGHT, type Calendar, type Series } from './intraday';
+import {
+  calendarFor,
+  getCalendar,
+  getSeries,
+  getSeriesForDay,
+  OVERNIGHT,
+  type Calendar,
+  type Series,
+} from './intraday';
 // Public market panels are saved as fetched, keyed by business day, so charts and the calendar can be shown for a
 // past brief and when a live source is down. Only public symbols are stored, never client names or positions.
 export type MarketPanel = { overnight: Series[]; movers: Series[]; calendar: Calendar | null };
@@ -64,7 +72,7 @@ export async function livePanels(db: Db, profileId: string, symbols: string[], n
     return {
       overnight: k.overnight.map((x) => recent.get(x) as Series),
       movers: k.movers.map((x) => recent.get(x) as Series),
-      calendar: recent.get('calendar') as Calendar,
+      calendar: calendarFor(recent.get('calendar') as Calendar, date),
     };
   const { overnight, movers, calendar } = await fetchAndSave(db, list, date, now);
   const missing = [
@@ -80,7 +88,7 @@ export async function livePanels(db: Db, profileId: string, symbols: string[], n
     movers: movers
       .map((s, i) => s ?? (saved.get('mover:' + list[i]) as Series | undefined))
       .filter((s): s is Series => !!s),
-    calendar: calendar ?? (saved.get('calendar') as Calendar | undefined) ?? null,
+    calendar: calendarFor(calendar ?? (saved.get('calendar') as Calendar | undefined) ?? null, date),
   };
 }
 /** A past day's panels exactly as last saved that day. */
@@ -90,7 +98,7 @@ export async function pastPanels(db: Db, profileId: string, symbols: string[], d
   return {
     overnight: k.overnight.flatMap((x) => (saved.has(x) ? [saved.get(x) as Series] : [])),
     movers: k.movers.flatMap((x) => (saved.has(x) ? [saved.get(x) as Series] : [])),
-    calendar: (saved.get('calendar') as Calendar | undefined) ?? null,
+    calendar: calendarFor((saved.get('calendar') as Calendar | undefined) ?? null, date),
   };
 }
 /** Pipeline capture: saves today's panels for the whole book even if nobody opens the brief. */

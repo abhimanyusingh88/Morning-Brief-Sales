@@ -453,7 +453,17 @@ export function ReportContent({ report, filters, market }: { report: Report; fil
               </p>
             </Section>
           )}
-          <Section title={'Economic data (ET)' + (market?.calendar?.scope === 'week' ? ' · this week' : '')}>
+          <Section
+            title={report.archived ? 'Economic data (ET)' : 'Economic data today (ET)'}
+            right={
+              market?.calendar ? (
+                <span className="num text-[11px] text-muted">
+                  {market.calendar.events.length} {market.calendar.events.length === 1 ? 'event' : 'events'}
+                  {report.archived ? '' : ' today'}
+                </span>
+              ) : null
+            }
+          >
             {market?.calendar?.events.length ? (
               <table className="w-full text-xs">
                 <thead>
@@ -467,14 +477,7 @@ export function ReportContent({ report, filters, market }: { report: Report; fil
                 <tbody className="divide-y divide-line">
                   {market.calendar.events.map((e, i) => (
                     <tr key={i}>
-                      <td className="num whitespace-nowrap py-1.5 pr-2 text-ink-2">
-                        {market.calendar!.scope === 'week'
-                          ? new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' }).format(
-                              new Date(e.time),
-                            ) + ' '
-                          : ''}
-                        {time(e.time)}
-                      </td>
+                      <td className="num whitespace-nowrap py-1.5 pr-2 text-ink-2">{time(e.time)}</td>
                       <td className="py-1.5 pr-2">
                         <span
                           className={
@@ -494,7 +497,9 @@ export function ReportContent({ report, filters, market }: { report: Report; fil
             ) : (
               <p className="text-xs text-muted">
                 {market?.calendar
-                  ? 'No economic releases were scheduled for this day, and no major US releases remained that week.'
+                  ? report.archived
+                    ? 'No economic releases or speakers were scheduled for this day.'
+                    : 'No economic releases or speakers are scheduled for today.'
                   : report.archived
                     ? 'No economic calendar was saved for this day.'
                     : 'The economic calendar source is unavailable. No releases are assumed.'}

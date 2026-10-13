@@ -144,22 +144,28 @@ export function parseCalendar(text: string, now: Date): Calendar {
       forecast: String(r.forecast ?? ''),
       previous: String(r.previous ?? ''),
     }));
-  const today = all.filter((e) => businessDate(new Date(e.time)) === businessDate(now) && e.impact !== 'Holiday');
-  const scope = today.length ? 'today' : 'week';
-  const events = (
-    today.length
-      ? today
-      : all
-          .filter((e) => Date.parse(e.time) >= now.getTime() && e.country === 'USD' && e.impact === 'High')
-          .slice(0, 10)
-  ).sort((a, b) => a.time.localeCompare(b.time));
+  // Today only, in US Eastern time. A later day's release or speech shown in a morning brief reads as today's, so a
+  // day with nothing scheduled is reported as empty rather than filled from the rest of the week.
+  const seen = new Set<string>();
+  const events = all
+    .filter((e) => e.title && e.impact !== 'Holiday' && businessDate(new Date(e.time)) === businessDate(now))
+    .filter((e) => {
+      const k = e.time + '|' + e.country + '|' + e.title.toLowerCase();
+      return seen.has(k) ? false : (seen.add(k), true);
+    })
+    .sort((a, b) => a.time.localeCompare(b.time));
   return {
     events,
     source: 'Forex Factory economic calendar',
     url: 'https://www.forexfactory.com/calendar',
     fetchedAt: now.toISOString(),
-    scope,
+    scope: 'today',
   };
+}
+/** A calendar limited to one US Eastern day. Copies saved before the today-only rule may hold later days' events. */
+export function calendarFor<T extends Calendar | null | undefined>(c: T, day: string): T {
+  if (!c) return c;
+  return { ...c, scope: 'today', events: c.events.filter((e) => businessDate(new Date(e.time)) === day) };
 }
 /**
  * The calendar provider rate-limits aggressively, so one shared database row is the source of truth:
@@ -178,13 +184,14 @@ export async function getCalendar(now = new Date(), db?: Db): Promise<Calendar |
       return null;
     }
   }
+  const day = businessDate(now);
   return cached('calrow:' + key, 60000, async () => {
     const [row] = await db.asService((q) =>
       q('select payload,fetched_at,attempted_at from live_calendar_cache where cache_key=$1', [key]),
     );
     const age = (x: unknown) => (x ? now.getTime() - new Date(String(x)).getTime() : Infinity);
-    if (row?.payload && age(row.fetched_at) < 30 * 60000) return row.payload as Calendar;
-    if (row && age(row.attempted_at) < 10 * 60000) return (row.payload as Calendar) ?? null;
+    if (row?.payload && age(row.fetched_at) < 30 * 60000) return calendarFor(row.payload as Calendar, day);
+    if (row && age(row.attempted_at) < 10 * 60000) return calendarFor((row.payload as Calendar) ?? null, day);
     await db.asService((q) =>
       q(
         'insert into live_calendar_cache(cache_key,attempted_at) values($1,now()) on conflict(cache_key) do update set attempted_at=now()',
@@ -201,7 +208,7 @@ export async function getCalendar(now = new Date(), db?: Db): Promise<Calendar |
       );
       return c;
     } catch {
-      return (row?.payload as Calendar) ?? null;
+      return calendarFor((row?.payload as Calendar) ?? null, day);
     }
   }).catch(() => null);
 }
