@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile } from 'node:fs/promises';
+import { AS_USER_SQL } from './identity';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import type { Db, Q } from './types';
@@ -41,15 +42,8 @@ export async function openPglite(dataDir?: string): Promise<{ db: Db; pg: PGlite
     asUser: (profileId, fn) =>
       serial(() =>
         pg.transaction(async (tx) => {
-          const identities = await tx.query<{ auth_user_id: string | null }>(
-            'select auth_user_id from profiles where id=$1 and is_active',
-            [profileId],
-          );
-          const subject = identities.rows[0]?.auth_user_id ?? profileId;
-          await tx.query('set local role authenticated');
-          await tx.query("select set_config('request.jwt.claims', $1, true)", [
-            JSON.stringify({ sub: subject, role: 'authenticated' }),
-          ]);
+          // The same statement as production, so every test exercises the identity switch that ships.
+          await tx.query(AS_USER_SQL, [profileId]);
           return fn(runner(tx));
         }),
       ),

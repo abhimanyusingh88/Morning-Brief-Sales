@@ -52,28 +52,44 @@ async function fetchAndSave(db: Db, list: string[], date: string, now: Date) {
   ]);
   return { overnight, movers, calendar };
 }
-const FRESH_SECONDS = 180;
+const FRESH_SECONDS = 180,
+  STALE_SECONDS = 600;
 const keysFor = (symbols: string[]) => ({
   overnight: OVERNIGHT.map((o) => 'overnight:' + o.symbol),
   movers: symbols.map((s) => 'mover:' + s),
 });
 /** Today's panels: fetched live and saved; any source that fails falls back to today's last saved copy. */
-export async function livePanels(db: Db, profileId: string, symbols: string[], now = new Date()): Promise<MarketPanel> {
+export async function livePanels(
+  db: Db,
+  profileId: string,
+  symbols: string[],
+  now = new Date(),
+  later?: (work: () => Promise<unknown>) => void,
+): Promise<MarketPanel> {
   const date = businessDate(now),
     list = [...new Set(symbols)].slice(0, 40);
   // Charts are five- and fifteen-minute bars, so a copy saved in the last few minutes is as current as a new fetch.
   // Opening the page then costs one database read instead of a request per chart; Refresh always saves new copies.
   const k = keysFor(list),
     wanted = [...k.overnight, ...k.movers, 'calendar'];
-  const recent = await storedPanels(db, profileId, date, wanted, FRESH_SECONDS).catch(
-    () => new Map<string, Series | Calendar>(),
-  );
-  if (wanted.every((x) => recent.has(x)))
-    return {
-      overnight: k.overnight.map((x) => recent.get(x) as Series),
-      movers: k.movers.map((x) => recent.get(x) as Series),
-      calendar: calendarFor(recent.get('calendar') as Calendar, date),
-    };
+  const from = (m: Map<string, Series | Calendar>) => ({
+    overnight: k.overnight.map((x) => m.get(x) as Series),
+    movers: k.movers.map((x) => m.get(x) as Series),
+    calendar: calendarFor(m.get('calendar') as Calendar, date),
+  });
+  const read = (seconds: number) =>
+    storedPanels(db, profileId, date, wanted, seconds).catch(() => new Map<string, Series | Calendar>());
+  const recent = await read(FRESH_SECONDS);
+  if (wanted.every((x) => recent.has(x))) return from(recent);
+  // A complete copy from the last few bars is shown at once, each chart with its own "last" time, while new copies
+  // are fetched and saved after the response. Anything older, or incomplete, is fetched before the page is shown.
+  if (later) {
+    const usable = await read(STALE_SECONDS);
+    if (wanted.every((x) => usable.has(x))) {
+      later(() => fetchAndSave(db, list, date, new Date()).catch(() => console.warn('[snapshots] refresh_failed')));
+      return from(usable);
+    }
+  }
   const { overnight, movers, calendar } = await fetchAndSave(db, list, date, now);
   const missing = [
     ...overnight.flatMap((s, i) => (s ? [] : ['overnight:' + OVERNIGHT[i].symbol])),

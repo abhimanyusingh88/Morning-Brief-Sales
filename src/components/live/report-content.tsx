@@ -267,6 +267,7 @@ export function ReportContent({ report, filters, market }: { report: Report; fil
   const newsCheck = report.sources.find((s) => s.key === 'news'),
     filtered = Boolean(filters.q || filters.topic || filters.symbol);
   const desk = report.desk,
+    cited = new Map((desk?.cited ?? []).map((c) => [c.id, c])),
     top = briefSelection(stories);
   const keyEvents = desk?.keyEvents?.length
     ? desk.keyEvents
@@ -304,18 +305,37 @@ export function ReportContent({ report, filters, market }: { report: Report; fil
             {keyEvents.map((e, i) => {
               const [label, ...rest] = e.text.split(/:\s([\s\S]+)/);
               const hasLabel = rest.length && label.length < 32;
+              // The first cited story in this person's list opens in the reader; otherwise the cited original is linked.
+              const own = e.storyIds.map((id) => byId.get(id)).find(Boolean),
+                source = own ?? e.storyIds.map((id) => cited.get(id)).find(Boolean);
               return (
                 <li key={i} className="flex gap-2.5 text-[14px] leading-relaxed text-ink">
                   <span aria-hidden="true" className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-navy" />
-                  <StoryLink story={byId.get(e.storyIds[0])}>
-                    {hasLabel ? (
+                  <span className="min-w-0">
+                    <StoryLink story={own}>
+                      {hasLabel ? (
+                        <>
+                          <strong className="font-semibold">{label}:</strong> <Figures text={rest[0]} />
+                        </>
+                      ) : (
+                        <Figures text={e.text} />
+                      )}
+                    </StoryLink>
+                    {source && !e.text.endsWith(source.publisher) ? (
                       <>
-                        <strong className="font-semibold">{label}:</strong> <Figures text={rest[0]} />
+                        {' '}
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={source.title}
+                          className="whitespace-nowrap text-[11px] font-medium text-muted underline decoration-line-strong underline-offset-2 hover:text-brand"
+                        >
+                          {source.publisher}
+                        </a>
                       </>
-                    ) : (
-                      <Figures text={e.text} />
-                    )}
-                  </StoryLink>
+                    ) : null}
+                  </span>
                 </li>
               );
             })}
@@ -406,19 +426,33 @@ export function ReportContent({ report, filters, market }: { report: Report; fil
                   <p className="serif text-[15px] leading-[1.7] text-ink-2">
                     <Figures text={s.text} />
                   </p>
-                  {s.storyIds.length ? (
+                  {s.storyIds.some((id) => byId.has(id) || cited.has(id)) ? (
                     <p className="mt-1.5 flex flex-wrap gap-x-3 text-[11px]">
                       {s.storyIds
-                        .map((id) => byId.get(id))
-                        .filter((x): x is Story => !!x)
+                        .filter((id) => byId.has(id) || cited.has(id))
                         .slice(0, 3)
-                        .map((a) => (
-                          <StoryLink key={a.id} story={a}>
-                            <span className="text-brand underline decoration-brand/30 underline-offset-2">
-                              {a.publisher}
-                            </span>
-                          </StoryLink>
-                        ))}
+                        .map((id) => {
+                          const a = byId.get(id),
+                            c = cited.get(id);
+                          return a ? (
+                            <StoryLink key={id} story={a}>
+                              <span className="text-brand underline decoration-brand/30 underline-offset-2">
+                                {a.publisher}
+                              </span>
+                            </StoryLink>
+                          ) : (
+                            <a
+                              key={id}
+                              href={c!.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={c!.title}
+                              className="text-brand underline decoration-brand/30 underline-offset-2"
+                            >
+                              {c!.publisher}
+                            </a>
+                          );
+                        })}
                     </p>
                   ) : null}
                 </Section>

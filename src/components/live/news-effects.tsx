@@ -53,7 +53,7 @@ function EffectsPanel({ story }: { story: Story }) {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? 'Analysis unavailable');
         if (response.status === 202) {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
           if (controller.signal.aborted) return;
           continue;
         }

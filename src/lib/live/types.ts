@@ -82,7 +82,10 @@ export type DeskNote = {
   keyEvents: { text: string; storyIds: string[] }[];
   wrap: string[];
   sections: { title: string; text: string; storyIds: string[] }[];
+  /** Sources the note cites that are not among this person's stories. Looked up when the brief is read, never stored. */
+  cited?: Citation[];
 };
+export type Citation = { id: string; title: string; url: string; publisher: string; publishedAt: string };
 export type Filters = { q: string; topic: string; symbol: string };
 export const EMPTY_FILTERS: Filters = { q: '', topic: '', symbol: '' };
 export const METRICS = [

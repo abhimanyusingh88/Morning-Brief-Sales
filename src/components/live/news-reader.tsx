@@ -26,7 +26,7 @@ async function loadReading(body: unknown, signal: AbortSignal): Promise<ReadingB
         signal.removeEventListener('abort', abort);
         resolve();
       };
-      const timer = setTimeout(done, 2500);
+      const timer = setTimeout(done, 1000);
       const abort = () => {
         clearTimeout(timer);
         reject(new DOMException('Aborted', 'AbortError'));

@@ -73,7 +73,7 @@ export function BriefView({
     setRefreshing(true);
     setMessage('Checking market data, news, charts and the calendar…');
     try {
-      for (let step = 0; step < 6; step++) {
+      for (let step = 0; step < 12; step++) {
         const r = await fetch('/api/live/refresh', { method: 'POST', signal: AbortSignal.timeout(75000) });
         const b = await r.json();
         if (!r.ok) throw new Error(b.error ?? 'Refresh unavailable');
@@ -86,7 +86,8 @@ export function BriefView({
             (b.pending === 1 ? 'check' : 'checks') +
             ' left. The brief updates as each step finishes.',
         );
-        await new Promise((res) => setTimeout(res, 31000));
+        // Continue at once while work is getting done; a source that is backing off after a failure gets a short pause.
+        await new Promise((res) => setTimeout(res, b.completed ? 2000 : 10000));
       }
       setMessage('Brief updated from available sources.');
     } catch (e) {

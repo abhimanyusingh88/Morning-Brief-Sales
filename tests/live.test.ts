@@ -1099,6 +1099,78 @@ describe('history evidence and saved charts', () => {
     expect(await db.asUser(a, (q) => q('select id from live_reports where id=$1', [t.id]))).toHaveLength(0);
     await db.asService((q) => q("delete from live_reports where fingerprint in('reverified-past','reverified-today')"));
   });
+  it('names the source of a market-note item whose story is outside the person’s own list', async () => {
+    const { getDayReport } = await import('../src/lib/live/reports');
+    const cited = uid('cited-outside-book'),
+      url = 'https://www.cnbc.com/2026/09/14/cited-outside-book.html';
+    await db.asService((q) =>
+      q(
+        "insert into live_articles(id,url,title,publisher,published_at,event_date,verified_at,symbols,topics,excerpt,evidence_hash,verification) values($1,$2,'Shipping rates climb','CNBC','2026-09-14T12:00:00Z','2026-09-14','2026-09-14T12:05:00Z',$3,$4,'Rates climbed.','cited-hash','publisher-page') on conflict(id) do nothing",
+        [cited, url, [], ['Trade']],
+      ),
+    );
+    const base = await makeReport(db, a, null, new Date('2026-09-14T18:00:00Z'));
+    const desk = {
+      generatedAt: '2026-09-14T18:00:00Z',
+      method: 'template',
+      keyEvents: [{ text: 'Trade: shipping rates climb', storyIds: [cited, 'not-an-id'] }],
+      wrap: [],
+      sections: [{ title: 'Europe', text: 'Shipping rates climb.', storyIds: [cited] }],
+    };
+    await db.asService((q) =>
+      q(
+        'insert into live_reports(profile_id,input_client_ids,business_date,cutoff,coverage_hash,fingerprint,payload) values($1,$2,$3,now(),$4,$5,$6::jsonb)',
+        [a, [], '2026-09-14', base.coverageHash, 'cited-outside', JSON.stringify({ ...base, articles: [], desk })],
+      ),
+    );
+    try {
+      const r = (await getDayReport(db, a, null, '2026-09-14'))!;
+      expect(r.articles).toHaveLength(0);
+      expect(r.desk?.cited).toEqual([
+        { id: cited, url, title: 'Shipping rates climb', publisher: 'CNBC', publishedAt: '2026-09-14T12:00:00.000Z' },
+      ]);
+      // The saved brief itself is untouched: the lookup happens when it is read.
+      const [row] = await db.asService((q) =>
+        q("select payload->'desk' ? 'cited' has from live_reports where fingerprint='cited-outside'"),
+      );
+      expect(row.has).toBe(false);
+    } finally {
+      await db.asService((q) => q("delete from live_reports where fingerprint='cited-outside'"));
+    }
+  });
+  it('shows recent saved charts at once and renews them after the response', async () => {
+    const { livePanels } = await import('../src/lib/live/snapshots');
+    const { OVERNIGHT } = await import('../src/lib/live/intraday');
+    const day = businessDate(),
+      keys = [...OVERNIGHT.map((o) => 'overnight:' + o.symbol), 'calendar'];
+    const put = (age: string) =>
+      db.asService(async (q) => {
+        for (const k of keys)
+          await q(
+            "insert into live_market_snapshots(business_date,key,payload,source,fetched_at) values($1,$2,$3::jsonb,'test',now()-$4::interval) on conflict(business_date,key) do update set payload=excluded.payload,fetched_at=excluded.fetched_at",
+            [
+              day,
+              k,
+              JSON.stringify(
+                k === 'calendar' ? { scope: 'today', events: [], source: 'test' } : { symbol: k, points: [] },
+              ),
+              age,
+            ],
+          );
+      });
+    const queued: (() => Promise<unknown>)[] = [];
+    try {
+      await put('5 minutes');
+      const panel = await livePanels(db, a, [], new Date(), (w) => queued.push(w));
+      expect(panel.overnight).toHaveLength(OVERNIGHT.length);
+      expect(queued).toHaveLength(1);
+      await put('1 minute');
+      await livePanels(db, a, [], new Date(), (w) => queued.push(w));
+      expect(queued).toHaveLength(1);
+    } finally {
+      await db.asService((q) => q("delete from live_market_snapshots where source='test'"));
+    }
+  });
   it('serves a day’s saved futures chart and calendar for its past brief', async () => {
     const { pastPanels } = await import('../src/lib/live/snapshots');
     const series = {

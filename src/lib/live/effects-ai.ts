@@ -228,10 +228,12 @@ async function originalEvidence(
   return { text: story.excerpt, basis: 'excerpt', url: story.url };
 }
 async function generateEffects(report: Report, story: Story, holdings: Holding[]): Promise<EffectsAnalysis> {
-  const evidence = await originalEvidence(story);
-  const prices = (
-    await Promise.all([...new Set(holdings.map((h) => h.symbol))].map((s) => getSeries(s, s, '1d', '15m')))
-  ).filter((x): x is Series => !!x);
+  // The article text and the holdings' prices come from different sources, so they are fetched together.
+  const [evidence, series] = await Promise.all([
+    originalEvidence(story),
+    Promise.all([...new Set(holdings.map((h) => h.symbol))].map((s) => getSeries(s, s, '1d', '15m'))),
+  ]);
+  const prices = series.filter((x): x is Series => !!x);
   const { facts, context } = effectsContext(report, story, holdings, evidence.text, prices);
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0, timeout: 40000 });
   const textArray = { type: 'array', items: { type: 'string' } };

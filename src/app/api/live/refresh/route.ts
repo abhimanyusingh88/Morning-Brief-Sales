@@ -35,6 +35,12 @@ export async function POST(request: Request) {
         "select count(*)::int n from live_jobs where kind in('market','news') and attempts<3 and (status='queued' or status='running')",
       ),
     );
+    // The thirty-second guard exists to stop overlapping refreshes. This one has finished, so when sources are still
+    // queued the next step may start straight away instead of waiting out the rest of the window.
+    if (open?.n)
+      await db.asService((q) =>
+        q("update live_refresh_requests set requested_at=now()-interval '29 seconds' where profile_id=$1", [id]),
+      );
     return Response.json({ ok: true, ...result, pending: open?.n ?? 0 }, { headers: { 'Cache-Control': 'no-store' } });
   } catch {
     return Response.json(

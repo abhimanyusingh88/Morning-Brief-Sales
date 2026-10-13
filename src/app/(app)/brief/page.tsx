@@ -1,4 +1,5 @@
 import { redirect, notFound } from 'next/navigation';
+import { after } from 'next/server';
 import { getMe } from '@/lib/auth/session';
 import { getDb } from '@/lib/db';
 import {
@@ -65,7 +66,8 @@ export default async function Page({
   // Live panels are saved as fetched; a failed source falls back to today's last saved copy.
   const [report, market, history] = await Promise.all([
     getReport(db, me.id, client),
-    livePanels(db, me.id, symbols),
+    // Charts saved in the last few minutes are shown at once and renewed after the response, so filters stay quick.
+    livePanels(db, me.id, symbols, new Date(), after),
     historyLoad,
   ]);
   return (

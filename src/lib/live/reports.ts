@@ -65,10 +65,13 @@ export const getCoverage = cache(async (db: Db, profileId: string) => {
 export type Coverage = Awaited<ReturnType<typeof getCoverage>>;
 /** Brief setup choices, limited to clients the person still covers and stocks still in those clients' books. */
 export const getFocus = cache(async (db: Db, profileId: string): Promise<Focus> => {
+  return focusFor(db, profileId, await getCoverage(db, profileId));
+});
+/** Brief setup choices checked against a book the caller has already loaded, so the book is never read twice. */
+async function focusFor(db: Db, profileId: string, book: Coverage): Promise<Focus> {
   const [r] = await db.asUser(profileId, (q) =>
     q('select focus_clients,focus_topics,focus_symbols from live_preferences where profile_id=$1', [profileId]),
   );
-  const book = await getCoverage(db, profileId);
   const clients = ((r?.focus_clients as string[]) ?? []).filter((id) => book.clients.some((c) => c.id === id));
   const held = new Set(
     book.holdings.filter((h) => !clients.length || clients.includes(h.clientId)).map((h) => h.symbol),
@@ -78,7 +81,7 @@ export const getFocus = cache(async (db: Db, profileId: string): Promise<Focus> 
     topics: ((r?.focus_topics as string[]) ?? []).filter((t) => (TOPICS as readonly string[]).includes(t)),
     symbols: ((r?.focus_symbols as string[]) ?? []).filter((s) => held.has(s)),
   };
-});
+}
 /** The book as the brief shows it: only the clients chosen in brief setup, or everyone when none are chosen. */
 export function focusCoverage<T extends { holdings: Holding[]; clients: Client[] }>(book: T, focus: Focus): T {
   if (!focus.clients.length) return book;
@@ -412,6 +415,37 @@ export async function publishReports(
   }
   return count;
 }
+/**
+ * The market note is written from the whole day's public evidence, while a person's brief keeps only the stories
+ * matched to their book. A source the note cites outside that list is looked up here, so every cited item still
+ * names and links its publisher. Public evidence only, read under the person's own access.
+ */
+async function citeDesk(q: Q, report: Report | null): Promise<Report | null> {
+  const desk = report?.desk;
+  if (!report || !desk) return report;
+  const have = new Set(report.articles.map((a) => a.id));
+  const missing = [
+    ...new Set([...desk.keyEvents, ...desk.sections].flatMap((x) => x.storyIds).filter((id) => !have.has(id))),
+  ].filter(validId);
+  if (!missing.length) return report;
+  const rows = await q(
+    "select id,url,title,publisher,published_at from live_articles where status='verified' and id=any($1::uuid[])",
+    [missing],
+  );
+  return {
+    ...report,
+    desk: {
+      ...desk,
+      cited: rows.map((r) => ({
+        id: String(r.id),
+        url: String(r.url),
+        title: String(r.title),
+        publisher: String(r.publisher),
+        publishedAt: iso(r.published_at),
+      })),
+    },
+  };
+}
 export async function getReport(
   db: Db,
   profileId: string,
@@ -420,11 +454,8 @@ export async function getReport(
   now = new Date(),
 ): Promise<Report | null> {
   if ((clientId && !validId(clientId)) || (reportId && !validId(reportId))) return null;
-  const [c, prefs, focus] = await Promise.all([
-    getCoverage(db, profileId),
-    getPreferences(db, profileId),
-    getFocus(db, profileId),
-  ]);
+  const c = await getCoverage(db, profileId);
+  const [prefs, focus] = await Promise.all([getPreferences(db, profileId), focusFor(db, profileId, c)]);
   return db.asUser(profileId, async (q) => {
     const rows = reportId
       ? await q('select id,payload from live_reports where id=$1 and profile_id=$2', [reportId, profileId])
@@ -437,7 +468,7 @@ export async function getReport(
     const payload = r.payload as Omit<Report, 'id'>;
     if (payload.coverageHash !== c.hash || hash(payload.preferences) !== hash(prefs) || payload.clientId !== clientId)
       return null;
-    return focusReport({ ...payload, id: String(r.id) }, focus);
+    return citeDesk(q, focusReport({ ...payload, id: String(r.id) }, focus));
   });
 }
 export type HistoryEntry = { id: string; businessDate: string; cutoff: string; stories: number };
@@ -454,32 +485,38 @@ export async function getArchivedReport(
   now = new Date(),
 ): Promise<Report | null> {
   if (!validId(reportId) || (clientId && !validId(clientId))) return null;
-  const [row] = await db.asUser(profileId, (q) =>
-    q(
-      'select id,payload from live_reports where id=$1 and profile_id=$2 and scope_client is not distinct from $3::uuid and business_date<$4',
-      [reportId, profileId, clientId, businessDate(now)],
+  // The saved brief and the current book are independent reads, so they load together.
+  const [[row], book] = await Promise.all([
+    db.asUser(profileId, (q) =>
+      q(
+        'select id,payload from live_reports where id=$1 and profile_id=$2 and scope_client is not distinct from $3::uuid and business_date<$4',
+        [reportId, profileId, clientId, businessDate(now)],
+      ),
     ),
-  );
+    getCoverage(db, profileId),
+  ]);
   if (!row) return null;
   const payload = { ...(row.payload as Omit<Report, 'id'>), id: String(row.id), archived: true } as Report;
   if (payload.clientId !== clientId) return null;
   // A day whose final brief was published before its wrap was ready still shows the wrap saved for that day.
-  if (!payload.desk) payload.desk = await db.asUser(profileId, (q) => latestDesk(q, payload.businessDate));
-  const covered = new Set((await getCoverage(db, profileId)).clients.map((c) => c.id)),
+  const covered = new Set(book.clients.map((c) => c.id)),
     held = [...new Set(payload.holdings.map((h) => h.clientId))];
   // A client retired from the book since then stays in the snapshot; only revoked coverage is narrowed away.
-  const retired = await db.asUser(profileId, (q) =>
-    q('select cid from unnest($1::uuid[]) cid where app.client_retired(cid)', [held]),
-  );
+  const [retired, focus, desk] = await Promise.all([
+    db.asUser(profileId, (q) => q('select cid from unnest($1::uuid[]) cid where app.client_retired(cid)', [held])),
+    focusFor(db, profileId, book),
+    payload.desk ? null : db.asUser(profileId, (q) => latestDesk(q, payload.businessDate)),
+  ]);
+  if (!payload.desk) payload.desk = desk;
   for (const r of retired) covered.add(String(r.cid));
-  const focus = await getFocus(db, profileId);
-  if (held.every((c) => covered.has(c))) return focusReport(payload, focus);
+  const cite = (r: Report | null) => (r ? db.asUser(profileId, (q) => citeDesk(q, r)) : null);
+  if (held.every((c) => covered.has(c))) return cite(focusReport(payload, focus));
   if (clientId) return null;
   const narrowed = narrowReport(
     payload,
     held.filter((c) => covered.has(c)),
   );
-  return narrowed ? focusReport({ ...narrowed, clientName: payload.clientName }, focus) : null;
+  return narrowed ? cite(focusReport({ ...narrowed, clientName: payload.clientName }, focus)) : null;
 }
 /** The final published brief for one past business day and client scope. */
 export async function getDayReport(
@@ -509,7 +546,8 @@ export async function listHistory(
   if (clientId && !validId(clientId)) return [];
   const rows = await db.asUser(profileId, (q) =>
     q(
-      "select distinct on(business_date) id,business_date,cutoff,jsonb_array_length(coalesce(payload->'articles','[]'::jsonb)) n from live_reports where profile_id=$1 and scope_client is not distinct from $2::uuid and business_date<$3 order by business_date desc,created_at desc limit $4",
+      // One newest-version lookup per day, so the access check and the story count run once a day, not once a version.
+      "select r.id,r.business_date,r.cutoff,r.n from (select ($3::date-g)::date d from generate_series(1,$4::int*2) g) days cross join lateral (select id,business_date,cutoff,jsonb_array_length(coalesce(payload->'articles','[]'::jsonb)) n from live_reports where profile_id=$1 and scope_client is not distinct from $2::uuid and business_date=days.d order by created_at desc limit 1) r order by r.business_date desc limit $4",
       [profileId, clientId, businessDate(now), limit],
     ),
   );
