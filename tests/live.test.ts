@@ -792,7 +792,7 @@ describe('news effects follow the filtered client book', () => {
 
 describe('grounded AI effects and private caching', () => {
   it('renders source-backed analysis for each holding and rejects invented figures or foreign holdings', async () => {
-    const r = (await getReport(db, a, null))!,
+    const r = (await getReport(db, a, null, undefined, new Date('2026-10-09T18:00:00Z')))!,
       story = r.articles.find((s) => s.id === uid('reader-source'))!;
     const held = effectHoldings(r, story);
     const { facts } = effectsContext(r, story, held, 'NVIDIA announced an updated chip platform.');
@@ -836,7 +836,7 @@ describe('grounded AI effects and private caching', () => {
     expect(effectHoldings(r, story, 'TSLA')).toHaveLength(0);
   });
   it('returns cached analysis without a model call and hides it from another salesperson', async () => {
-    const r = (await getReport(db, a, null))!,
+    const r = (await getReport(db, a, null, undefined, new Date('2026-10-09T18:00:00Z')))!,
       story = r.articles.find((s) => s.id === uid('reader-source'))!,
       key = effectsCacheKey(r, story);
     const analysis = {
@@ -869,7 +869,7 @@ describe('grounded AI effects and private caching', () => {
     ).toHaveLength(0);
   });
   it('requires authenticated report ownership and stock membership before analysis', async () => {
-    const r = (await getReport(db, a, null))!,
+    const r = (await getReport(db, a, null, undefined, new Date('2026-10-09T18:00:00Z')))!,
       story = r.articles.find((s) => s.id === uid('reader-source'))!;
     const { POST } = await import('../src/app/api/live/effects/route');
     const body = { report: r.id, client: null, article: story.id, symbol: '' };
