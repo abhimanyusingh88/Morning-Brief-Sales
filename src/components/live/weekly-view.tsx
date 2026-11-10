@@ -3,6 +3,7 @@ import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Sparkline } from '@/components/ui/chart';
+import { ClientBars, WeekLines } from '@/components/live/weekly-charts';
 import { Figures } from '@/components/ui/figures';
 import { EmptyState } from '@/components/ui/states';
 import { cn } from '@/lib/cn';
@@ -23,139 +24,6 @@ function Stat({ label, value, sub, className }: { label: string; value: string; 
         {sub ? <p className="mt-0.5 text-xs text-muted">{sub}</p> : null}
       </CardBody>
     </Card>
-  );
-}
-
-/** Diverging bars: each client's five-session move, gains right of zero and losses left. */
-function ClientBars({ clients }: { clients: ClientMove[] }) {
-  const W = 720,
-    row = 30,
-    labelW = 210,
-    valueW = 78,
-    H = clients.length * row + 8;
-  const max = Math.max(...clients.map((c) => Math.abs(c.pct)), 0.01);
-  const plot = W - labelW - valueW;
-  const zero = labelW + plot / 2;
-  const scale = (v: number) => (v / max) * (plot / 2 - 4);
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Weekly move by client, in percent" className="h-auto w-full">
-      <line x1={zero} x2={zero} y1={0} y2={H} stroke="currentColor" strokeOpacity={0.2} />
-      {clients.map((c, i) => {
-        const y = i * row + 4,
-          w = scale(c.pct);
-        return (
-          <g key={c.clientId}>
-            <text x={labelW - 10} y={y + row / 2 + 4} textAnchor="end" fontSize={12} fill="currentColor">
-              {c.name.length > 28 ? c.name.slice(0, 27) + '…' : c.name}
-            </text>
-            <rect
-              x={w >= 0 ? zero : zero + w}
-              y={y + 6}
-              width={Math.max(Math.abs(w), 1.5)}
-              height={row - 12}
-              rx={3}
-              fill={c.pct >= 0 ? 'var(--color-up)' : 'var(--color-down)'}
-            />
-            <text
-              x={W - 4}
-              y={y + row / 2 + 4}
-              textAnchor="end"
-              fontSize={12}
-              fontWeight={600}
-              className="num"
-              fill={c.pct > 0 ? 'var(--color-up)' : c.pct < 0 ? 'var(--color-down)' : 'currentColor'}
-            >
-              {fmtPct(c.pct)}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-const LINE_COLORS = ['#1f6feb', 'var(--color-up)', 'var(--color-down)'];
-/** Cumulative percent move through the week, session by session, for the book and its biggest movers. */
-function WeekLines({ dates, lines }: { dates: string[]; lines: { label: string; path: { pct: number }[] }[] }) {
-  const W = 720,
-    H = 240,
-    padL = 8,
-    padR = 64,
-    padT = 12,
-    padB = 26;
-  const vals = lines.flatMap((l) => l.path.map((p) => p.pct)).concat(0);
-  let lo = Math.min(...vals),
-    hi = Math.max(...vals);
-  const span = hi - lo || 1;
-  lo -= span * 0.1;
-  hi += span * 0.1;
-  const x = (i: number) => padL + (i / (dates.length - 1)) * (W - padL - padR);
-  const y = (v: number) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
-  const ticks = Array.from({ length: 5 }, (_, i) => lo + ((hi - lo) * (i + 0.5)) / 5);
-  return (
-    <div>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        role="img"
-        aria-label="Cumulative weekly move by session"
-        className="h-auto w-full"
-      >
-        {ticks.map((v) => (
-          <g key={v}>
-            <line x1={padL} x2={W - padR} y1={y(v)} y2={y(v)} stroke="currentColor" strokeOpacity={0.07} />
-            <text x={W - padR + 8} y={y(v) + 4} fontSize={11} fill="currentColor" fillOpacity={0.6} className="num">
-              {fmtPct(v, 1)}
-            </text>
-          </g>
-        ))}
-        <line
-          x1={padL}
-          x2={W - padR}
-          y1={y(0)}
-          y2={y(0)}
-          stroke="currentColor"
-          strokeOpacity={0.35}
-          strokeDasharray="3 4"
-        />
-        {dates.map((d, i) => (
-          <text
-            key={d}
-            x={x(i)}
-            y={H - 6}
-            fontSize={11}
-            fill="currentColor"
-            fillOpacity={0.6}
-            textAnchor={i === 0 ? 'start' : i === dates.length - 1 ? 'end' : 'middle'}
-          >
-            {shortDay(d)}
-          </text>
-        ))}
-        {lines.map((l, k) => (
-          <g key={l.label}>
-            <path
-              d={l.path.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.pct).toFixed(1)).join(' ')}
-              fill="none"
-              stroke={LINE_COLORS[k]}
-              strokeWidth={k === 0 ? 2.4 : 1.6}
-              strokeDasharray={k === 0 ? undefined : '0'}
-              strokeLinejoin="round"
-            />
-            {l.path.map((p, i) => (
-              <circle key={i} cx={x(i)} cy={y(p.pct)} r={k === 0 ? 3 : 2.2} fill={LINE_COLORS[k]} />
-            ))}
-          </g>
-        ))}
-      </svg>
-      <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
-        {lines.map((l, k) => (
-          <li key={l.label} className="flex items-center gap-2">
-            <span className="inline-block h-[3px] w-4 rounded" style={{ background: LINE_COLORS[k] }} />
-            <span className="text-ink-2">{l.label}</span>
-            <span className={cn('num font-semibold', tone(l.path.at(-1)!.pct))}>{fmtPct(l.path.at(-1)!.pct)}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 
@@ -408,7 +276,15 @@ export function WeeklyView({ book, assigned }: { book: WeeklyBook; assigned: num
             sub="Five-session change in each client's book, percent of gross exposure"
           />
           <CardBody className="text-ink">
-            <ClientBars clients={book.clients} />
+            <ClientBars
+              clients={book.clients.map((c) => ({
+                clientId: c.clientId,
+                name: c.name,
+                pct: c.pct,
+                pnl: c.pnl,
+                exposure: c.exposure,
+              }))}
+            />
           </CardBody>
         </Card>
         <Card>
