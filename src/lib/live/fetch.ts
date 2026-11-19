@@ -44,6 +44,9 @@ export const ALLOWED_HOSTS = new Set([
   'query1.finance.yahoo.com',
   'query2.finance.yahoo.com',
   'nfs.faireconomy.media',
+  // Leveraged ETF issuers: daily shares outstanding and NAV files.
+  'accounts.profunds.com',
+  'www.direxion.com',
 ]);
 export function sourceUrl(raw: string): URL {
   const u = new URL(raw);
@@ -74,7 +77,18 @@ export function publicAddress(a: string): boolean {
       (x === 198 && (y === 18 || y === 19))
     );
   }
-  if (isIP(a) === 6) return /^(2|3)/i.test(a) && !/^2001:(db8|0:)/i.test(a);
+  if (isIP(a) === 6) {
+    // NAT64 (RFC 6052 well-known prefix) and IPv4-mapped forms carry an IPv4 address: judge that address. Networks
+    // with DNS64 return these for every IPv4-only host, so rejecting them outright breaks those sources.
+    const embedded = /^(?:64:ff9b::|::ffff:)(?:([0-9a-f]{1,4}):([0-9a-f]{1,4})|(\d+\.\d+\.\d+\.\d+))$/i.exec(a);
+    if (embedded) {
+      if (embedded[3]) return publicAddress(embedded[3]);
+      const hi = parseInt(embedded[1], 16),
+        lo = parseInt(embedded[2], 16);
+      return publicAddress([hi >> 8, hi & 255, lo >> 8, lo & 255].join('.'));
+    }
+    return /^(2|3)/i.test(a) && !/^2001:(db8|0:)/i.test(a);
+  }
   return false;
 }
 const AGENT = 'MorningBrief/1.0 (public-source verification)';

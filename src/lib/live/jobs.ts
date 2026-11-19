@@ -6,6 +6,7 @@ import { collectNews, type NewsResult } from './news';
 import { hash, publishReports } from './reports';
 import { sendMorningBrief } from './email';
 import { capturePanels } from './snapshots';
+import { prepareEtf } from './etf';
 export type Job = {
   id: string;
   kind: 'market' | 'news' | 'publish';
@@ -243,5 +244,11 @@ export async function refresh(
   if (deadline - Date.now() > 12000) await capturePanels(db).catch(() => console.warn('[snapshots] capture_failed'));
   // Email the finished brief once it is due (default 09:30 ET on weekdays); idempotent per recipient and day.
   if (deadline - Date.now() > 25000) await sendMorningBrief(db).catch(() => console.warn('[email] brief_send_failed'));
+  // Leveraged ETF creations/redemptions from the issuers (refetched at most every thirty minutes), and the day's note.
+  // Last, so it can never take time from the brief or its email.
+  if (deadline - Date.now() > 20000)
+    await prepareEtf(db, { modelMs: Math.min(45000, deadline - Date.now() - 15000) }).catch(() =>
+      console.warn('[etf] prepare_failed'),
+    );
   return { completed, failed };
 }

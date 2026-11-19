@@ -1,4 +1,4 @@
-import { BookOpenText, ChartNoAxesCombined, SlidersHorizontal, Users, type LucideIcon } from 'lucide-react';
+import { BookOpenText, ChartNoAxesCombined, Layers, SlidersHorizontal, Users, type LucideIcon } from 'lucide-react';
 import type { Role } from '@/lib/auth/session';
 export interface NavItem {
   href: string;
@@ -14,6 +14,7 @@ export const NAV: { group: string; items: NavItem[] }[] = [
       { href: '/brief', label: 'Market brief', icon: BookOpenText, roles },
       { href: '/clients', label: 'Client coverage', icon: Users, roles },
       { href: '/weekly', label: 'Weekly moves', icon: ChartNoAxesCombined, roles },
+      { href: '/etf', label: 'Leveraged ETFs', icon: Layers, roles },
     ],
   },
   { group: 'Account', items: [{ href: '/setup', label: 'Brief setup', icon: SlidersHorizontal, roles }] },
